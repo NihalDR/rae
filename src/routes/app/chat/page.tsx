@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Loader2, MessageCircle, Globe, Brain } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
-import animatedUnscreenGif from "../../../assets/animated-gifs01-unscreen.gif";
+import thinkingGif from "../../../assets/thinking.gif";
 import ChatSidebarButton from "./components/ChatSidebarButton";
 import { useUserStore } from "@/store/userStore";
 import { useChatStore } from "@/store/chatStore";
@@ -385,7 +385,7 @@ export default function ChatWindow() {
               </div>
             ))}
 
-            {/* AI Thinking Animation - Simple Pulsing Dot */}
+            {/* AI Thinking Animation - Thinking GIF */}
             {isAIThinking && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.8 }}
@@ -395,7 +395,7 @@ export default function ChatWindow() {
                 className="self-start flex items-center justify-center"
               >
                 <img
-                  src={animatedUnscreenGif}
+                  src={thinkingGif}
                   alt="AI thinking animation"
                   className="w-10 h-10 object-cover"
                 />

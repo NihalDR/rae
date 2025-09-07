@@ -25,7 +25,7 @@ import CodeBlock from "@/components/misc/CodeBlock";
 import { animations } from "@/constants/animations";
 import { invoke } from "@tauri-apps/api/core";
 import { useNoteStore } from "@/store/noteStore";
-import animatedUnscreenGif from "../../../assets/animated-gifs01-unscreen.gif";
+import thinkingGif from "../../../assets/thinking.gif";
 const MODELS = [
   { label: "OpenAi", value: "gpt-4o-mini" },
   { label: "OpenAi", value: "gpt-4o" },
@@ -663,7 +663,7 @@ export const ChatView = ({
             );
           })}
 
-          {/* AI Thinking Animation - Simple Pulsing Dot */}
+          {/* AI Thinking Animation - Thinking GIF */}
           {isAIThinking && (
             <motion.div
               initial={{ opacity: 0, scale: 0.8 }}
@@ -673,7 +673,7 @@ export const ChatView = ({
               className="self-start flex items-center justify-center"
             >
               <img
-                src={animatedUnscreenGif}
+                src={thinkingGif}
                 alt="AI thinking animation"
                 className="w-10 h-10 object-cover"
               />
