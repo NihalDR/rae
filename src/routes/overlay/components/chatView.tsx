@@ -528,7 +528,7 @@ export const ChatView = ({
       ref={chatContainerRef}
       className="no-drag flex flex-col overflow-hidden  relative min-h-[400px] z-[1000] rounded-xl shadow-lg mt-2"
     >
-      <div className="flex-1 flex flex-col overflow-hidden text-foreground dark:bg-[#010101] min-h-[300px] relative transition-all duration-200">
+      <div className="flex-1 flex flex-col overflow-hidden text-foreground dark:bg-[#010101] bg-white min-h-[300px] relative transition-all duration-200">
         {/* Chat header */}
         <div className="h-fit items-center border-b-2 overflow-hidden border-b-border/20 w-full flex">
           <div className="h-full w-full flex justify-between items-center p-2 tracking-tight font-medium">

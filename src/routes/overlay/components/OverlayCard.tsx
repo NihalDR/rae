@@ -704,7 +704,7 @@ const Overlay = () => {
             opacity: { duration: 0.2, ease: "easeOut" },
             y: { duration: 0.3, ease: "easeOut" },
           }}
-          className={`flex items-center z-[100000] dark:bg-[#010101]  w-full h-[44px] shrink-0 ${
+          className={`flex items-center z-[100000] dark:bg-[#010101] bg-white  w-full h-[44px] shrink-0 ${
             !isPinned ? "drag" : ""
           } ${isNotch ? "pointer-events-none" : ""}`}
           style={{  borderRadius: "12px" }}
@@ -784,7 +784,7 @@ const Overlay = () => {
                 <div
                   className={`flex w-full h-full items-center border-l border-border px-4 py-2 ${
                     !isPinned ? "drag" : ""
-                  } dark:bg-[#010101] max-w-xs`}
+                  } dark:bg-[#010101] bg-white max-w-xs`}
                 >
                   <input
                     autoFocus

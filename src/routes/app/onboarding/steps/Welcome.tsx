@@ -13,7 +13,11 @@ interface WelcomeProps {
 const Welcome: React.FC<WelcomeProps> = ({ onNext }) => {
   const { loggedIn, showSplash, setShowSplash } = useUserStore();
   const navigate = useNavigate();
-
+  useEffect(() => {
+    if (loggedIn) {
+      navigate("/app/chat");
+    }
+  }, [loggedIn])
   useEffect(() => {
     // Close any stray magic dot once on load; avoid repeated closing to allow user toggles
     invoke("close_magic_dot").catch(console.error);
