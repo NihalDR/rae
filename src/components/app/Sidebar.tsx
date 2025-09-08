@@ -121,7 +121,7 @@ const Sidebar = () => {
       transition={{ ease: "circInOut", duration: 0.3 }}
       className="border-r border-border text-foreground overflow-hidden bg-background py-[2px] shrink-0 h-full flex flex-col overflow-y-auto"
     >
-      <div className="w-full shrink-0 h-[60px] flex p-2 pb-1 justify-end overflow-hidden items-center">
+      <div className="w-full shrink-0 h-[56px] flex p-2 pb-1 justify-end overflow-hidden items-center">
         <motion.div
           animate={{ opacity: expanded ? 1 : 0 }}
           className=" px-4  font-mono text-sm dark:text-zinc-700 font-black whitespace-nowrap pointer-events-none text-left w-full"
