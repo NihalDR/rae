@@ -19,19 +19,25 @@ const Welcome: React.FC<WelcomeProps> = ({ onNext }) => {
     invoke("close_magic_dot").catch(console.error);
   }, []);
   const handleNext = () => {
-    
     onNext("auth");
   };
   return (
-    <div className="drag min-h-screen flex items-center rounded-md justify-center bg-white relative">
+    <div className="drag min-h-screen flex items-center rounded-md justify-center  relative">
       <div className="text-center p-8 z-[1000]">
         <motion.div
           initial={{ opacity: 0, y: 5 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: "circInOut", type: "tween" }}
-          className="text-6xl !font-instrument-sans !tracking-tighter  mb-2"
+          className="text-6xl !font-instrument-sans !tracking-tighter  mb-2 flex gap-2 justify-center items-center"
         >
-          Rae
+          <motion.div
+            
+            
+            className="aspect-square rounded-full shrink-0 size-[52px] border-8 border-surface h-full"
+          ></motion.div>
+          <motion.div>
+            Rae
+          </motion.div>
         </motion.div>
         <motion.p
           initial={{ opacity: 0, y: 5 }}
@@ -42,8 +48,7 @@ const Welcome: React.FC<WelcomeProps> = ({ onNext }) => {
             type: "tween",
             delay: 0.1,
           }}
-          
-          className="text-smd text-black font-medium  mb-5"
+          className="text-smd  font-medium  mb-5"
         >
           Your personal assistant
         </motion.p>
@@ -58,24 +63,12 @@ const Welcome: React.FC<WelcomeProps> = ({ onNext }) => {
               delay: 0.2,
             }}
           >
-            <Button onClick={() => handleNext()} className="w-[200px]">
+            <Button className="hover:dark:bg-surface/70 dark:bg-surface " onClick={() => handleNext()}>
               Get started
             </Button>
           </motion.div>
         )}
       </div>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 0.6 }}
-        transition={{ delay: 0.3, duration: 1 }}
-        onAnimationComplete={() => {
-          if (loggedIn) {
-            setShowSplash(true);
-            navigate("/app/chat");
-          }
-        }}
-        className="absolute z-10 size-[80vw] bottom-0 translate-y-1/2 rounded-full bg-[#FFF200] [filter:blur(100px)] opacity-60"
-      ></motion.div>
     </div>
   );
 };

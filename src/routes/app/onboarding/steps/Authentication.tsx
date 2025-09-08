@@ -61,8 +61,8 @@ const Auth: React.FC<{ onNext: (step: string) => void }> = ({ onNext }) => {
   };
 
   return (
-    <div className="drag rounded-md min-h-screen flex items-center justify-center bg-white">
-      <div className="w-full max-w-sm bg-white p-8 rounded-xl flex flex-col gap-2">
+    <div className="drag rounded-md min-h-screen flex items-center justify-center ">
+      <div className="w-full max-w-sm  p-8 rounded-xl flex flex-col gap-2">
         <h1 className="text-center mb-2 text-4xl !font-instrument-sans tracking-tighter  ">
           {isLogin ? "Login" : "Create an account"}
         </h1>
@@ -72,7 +72,7 @@ const Auth: React.FC<{ onNext: (step: string) => void }> = ({ onNext }) => {
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="no-drag w-full px-4 py-3 border rounded-lg bg-gray-100 text-sm"
+          className="no-drag w-full px-4 py-3 border-2 dark:border-zinc-600 focus:dark:border-surface/80 rounded-lg  text-sm outline-none"
         />
 
         <input
@@ -80,7 +80,7 @@ const Auth: React.FC<{ onNext: (step: string) => void }> = ({ onNext }) => {
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="no-drag w-full  px-4 py-3 border rounded-lg bg-gray-100 text-sm"
+          className="no-drag w-full px-4 py-3 border-2 dark:border-zinc-600 focus:dark:border-surface/80 rounded-lg  text-sm outline-none"
         />
 
         {!isLogin && (
@@ -89,7 +89,7 @@ const Auth: React.FC<{ onNext: (step: string) => void }> = ({ onNext }) => {
             placeholder="Confirm Password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
-            className="no-drag w-full  px-4 py-3 border rounded-lg bg-gray-100 text-sm"
+            className="no-drag w-full  px-4 py-3 border rounded-lg  text-sm"
           />
         )}
 
@@ -97,10 +97,10 @@ const Auth: React.FC<{ onNext: (step: string) => void }> = ({ onNext }) => {
 
         <Button
           onClick={handleSubmit}
-          className="w-full "
+          className="w-full dark:bg-surface hover:dark:bg-surface/80"
           // className="no-drag w-full flex justify-center items-center mb-2 py-3 rounded-full bg-black text-white font-medium cursor-pointer hover:scale-105 transition-all duration-300"
         >
-          {loading ? <div className="w-full flex items-center justify-center" ><Loader className="animate-spin" /></div> : "Continue"}
+          {loading ? <div className="w-full flex items-center justify-center " ><Loader className="animate-spin"  /></div> : "Continue"}
         </Button>
 
         <Button

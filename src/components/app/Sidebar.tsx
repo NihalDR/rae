@@ -76,6 +76,7 @@ const Sidebar = () => {
   const navigate = useNavigate();
   const { clearUser } = useUserStore();
   const { convoHistory, setCurrentConvo, currentConvoId } = useChatStore();
+  
   // Log all convo titles on render and whenever convoHistory changes
   useEffect(() => {
     if (Array.isArray(convoHistory)) {
@@ -235,9 +236,9 @@ const Sidebar = () => {
         animate={{ height: expanded ? "70px" : "60px" }}
         className="w-full p-2"
       >
-        <div className="rounded-lg overflow-hidden w-full h-full p-2 flex  dark:bg-zinc-800/20 dark:text-white gap-2">
+        <button onClick={() => handlelogout()} className="rounded-lg overflow-hidden w-full h-full p-2 flex dark:hover:bg-zinc-800 transition-colors duration-100 cursor-pointer  dark:bg-zinc-800/20 dark:text-white gap-2">
           <div className="h-full aspect-square shrink-0 rounded-full bg-surface"></div>
-          <motion.div animate={{ opacity: expanded ? 1 : 0 }} className=" flex flex-col ">
+          <motion.div animate={{ opacity: expanded ? 1 : 0 }} className=" flex flex-col items-start">
             <div className="text-sm font-medium dark:text-zinc-200 ">
               {name}
             </div>
@@ -245,7 +246,7 @@ const Sidebar = () => {
               {email}
             </div>
           </motion.div>
-        </div>
+        </button>
       </motion.div>
     </motion.div>
   );

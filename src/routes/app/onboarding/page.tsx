@@ -49,7 +49,7 @@ const Onboarding: React.FC = () => {
         />
       </div> */}
       {/*//After NAME IT DIRECTLY NAVS TO FINISH FOR NEW USERS*/}
-      <div className="bg-white flex-grow">
+      <div className="bg-background text-foreground flex-grow">
         {step === "welcome" && <Welcome onNext={setStep} />}
         {step === "auth" && <Auth onNext={setStep} />}
         {step === "name" && <Name onNext={setStep} />}
