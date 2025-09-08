@@ -11,7 +11,7 @@ const FinishStep: React.FC<FinishProps> = ({ onNext }) => {
   const { loggedIn } = useUserStore();
   const handleFinish = () => {
     if (loggedIn) {
-      navigate("/app/landing");
+      navigate("/app/chat");
     }
     onNext("fetchInfo");
   };

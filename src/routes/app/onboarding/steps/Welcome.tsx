@@ -71,7 +71,7 @@ const Welcome: React.FC<WelcomeProps> = ({ onNext }) => {
         onAnimationComplete={() => {
           if (loggedIn) {
             setShowSplash(true);
-            navigate("/app/landing");
+            navigate("/app/chat");
           }
         }}
         className="absolute z-10 size-[80vw] bottom-0 translate-y-1/2 rounded-full bg-[#FFF200] [filter:blur(100px)] opacity-60"
