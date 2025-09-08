@@ -14,7 +14,7 @@ export const SignUp = async (
   password: string,
 ): Promise<{ success: boolean; message: string }> => {
   try {
-    const res = await axios.post(`${BASE_URL}/signup`, { email, password });
+    const res = await axios.post(`${BASE_URL}/auth/signup`, { email, password });
 
     return {
       success: res.status === 201,
@@ -37,7 +37,7 @@ export const Login = async (
   password: string,
 ): Promise<{ success: boolean; message: string }> => {
   try {
-    const res = await axios.post(`${BASE_URL}/login`, { email, password });
+    const res = await axios.post(`${BASE_URL}/auth/login`, { email, password });
 
     return {
       success: res.status === 200,
