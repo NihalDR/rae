@@ -1,13 +1,11 @@
-{
-  /*
+/*
   This is the chat api.
   It is used to generate messages and get conversations.
 */
-}
 
 import axios from "axios";
 
-const BASE_URL = "https://quackback-xwhd.onrender.com/api";
+export const BASE_URL = "http://localhost:8000/api";
 
 export const Generate = async ({
   email,
@@ -16,21 +14,28 @@ export const Generate = async ({
   conversationId,
   provider,
   modelName,
-  image, //todp
+  image, //todo
   tool = 0, // default to infinite chat
 }): Promise<any> => {
   try {
-    const res = await axios.post(`${BASE_URL}/generate/msg`, {
-      email,
-      message,
-      newConvo,
-      conversationId,
-      provider,
-      modelName,
-      image,
-      tool,
-    });
-    return res.data;
+    let res;
+
+    if (image || tool) {
+      // ✅ Normal axios request
+      res = await axios.post(`${BASE_URL}/generate/msg`, {
+        email,
+        message,
+        newConvo,
+        conversationId,
+        provider,
+        modelName,
+        image,
+        tool,
+      });
+      return res.data;
+    } else {
+
+    }
   } catch (err: any) {
     const message =
       err.response?.data || "Response Generation Failed. Try again later.";

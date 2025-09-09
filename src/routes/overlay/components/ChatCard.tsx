@@ -14,6 +14,7 @@ import {
   Generate,
   GenerateWithWebSearch,
   GenerateWithSupermemory,
+  BASE_URL,
 } from "@/api/chat";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -162,7 +163,6 @@ export const ChatView = ({
   windowName,
   windowIcon,
 
-
   windowScreenshot,
   isActive,
 }: ChatViewProps) => {
@@ -187,9 +187,9 @@ export const ChatView = ({
   // const [expandedChat, setExpanded] = useState(false);
   const [titleLoading, setTitleLoading] = useState(false);
   const [currResponse, setCurrResponse] = useState<string>("");
+  const [streamingMsg, setStreamingMsg] = useState<string>("");
   const [isAIThinking, setIsAIThinking] = useState(false);
-  const [typingText, setTypingText] = useState<string>("");
-  const [isTyping, setIsTyping] = useState(false);
+  // Removed typing animation logic
   const [isInputTyping, setIsInputTyping] = useState(false);
   const [selectedTool, setSelectedTool] = useState<0 | 1 | 2>(0); // 0=none, 1=web search, 2=supermemory
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
@@ -198,20 +198,88 @@ export const ChatView = ({
   // Refs for scrolling
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
-  const typingRef = useRef<{ animationId: number | null }>({
-    animationId: null,
-  });
+
+  const handleStreamAIResponse = async (
+    email,
+    message,
+    newConvo,
+    conversationId,
+    provider,
+    modelName,
+    image,
+    tool
+  ) => {
+    // Streaming block
+    setStreamingMsg("");
+    const response = await fetch(`${BASE_URL}/generate/msg`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email,
+        message,
+        newConvo,
+        conversationId,
+        provider,
+        modelName,
+        image,
+        tool,
+      }),
+    });
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error("ReadableStream not supported in this environment.");
+    }
+    const decoder = new TextDecoder();
+    let fullText = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      chunk.split("\n\n").forEach((event) => {
+        if (!event.trim()) return;
+        const dataLine = event.replace(/^data:\s*/, "");
+        try {
+          const data = JSON.parse(dataLine);
+          if (data.type === "chunk") {
+            fullText += data.content;
+            setStreamingMsg((prev) => prev + data.content);
+          } else if (data.type == "title") {
+            // Optionally handle title
+          } else if (data.type === "done") {
+            // Stream complete
+            setStreamingMsg("");
+            setCurrResponse(fullText);
+            // Add final message to chat
+            setMessages([...messages, { sender: "ai", text: fullText, image: "" }]);
+            return {
+              success: true,
+              data: fullText,
+            };
+          }
+        } catch {
+          // fallback: raw chunk
+          fullText += dataLine;
+          setStreamingMsg((prev) => prev + dataLine);
+        }
+      });
+    }
+
+    setStreamingMsg("");
+    setCurrResponse(fullText);
+  setMessages([...messages, { sender: "ai", text: fullText, image: "" }]);
+    return {
+      success: true,
+      data: fullText,
+    };
+  };
+  // Removed typingRef for typing animation
 
   const handleAIResponse = async (userMsg: string, manualImage?: string) => {
     if (userMsg.trim() === "") return;
-
-    // Stop any ongoing typing animation
-    setIsTyping(false);
-    setTypingText("");
-    if (typingRef.current.animationId !== null) {
-      cancelAnimationFrame(typingRef.current.animationId);
-      typingRef.current.animationId = null;
-    }
 
     const newMessages = [
       ...messages,
@@ -224,48 +292,46 @@ export const ChatView = ({
     setMessages(newMessages);
     if (overlayConvoId === -1) setTitleLoading(true);
 
-    // Set AI thinking state to true
     setIsAIThinking(true);
 
-    console.log("Sending:", messages, "overlay convo id :", overlayConvoId);
-
-    // Use manual image if provided, otherwise use window screenshot (only if toggle is active)
     const imageToSend = manualImage || (isActive ? windowScreenshot : "") || "";
-    console.log(
-      "Image to send:",
-      imageToSend.length || 0,
-      "characters",
-      manualImage ? "(manual)" : "(window screenshot)"
-    );
 
     try {
-      const ai_res = await Generate({
-        email: email,
-        message: userMsg,
-        newConvo: overlayConvoId === -1,
-        conversationId: overlayConvoId,
-        provider: currentModel.label,
-        modelName: currentModel.value,
-        image: imageToSend,
-      });
+      let ai_res;
+      if (imageToSend == "") {
+        await handleStreamAIResponse(
+          email,
+          userMsg,
+          overlayConvoId === -1,
+          overlayConvoId,
+          currentModel.label,
+          currentModel.value,
+          "",
+          selectedTool
+        );
+      } else {
+        ai_res = await Generate({
+          email: email,
+          message: userMsg,
+          newConvo: overlayConvoId === -1,
+          conversationId: overlayConvoId,
+          provider: currentModel.label,
+          modelName: currentModel.value,
+          image: imageToSend,
+        });
 
-      // Start typing animation instead of immediately showing the full response
-      const updatedMessages = [
-        ...newMessages,
-        { sender: "ai" as const, text: ai_res.aiResponse, image: "" },
-      ];
+        const updatedMessages = [
+          ...newMessages,
+          { sender: "ai" as const, text: ai_res.aiResponse, image: "" },
+        ];
 
-      // Auto-expand chat when AI response is received (if not already expanded)
+        setMessages(updatedMessages);
+        setCurrResponse(ai_res.aiResponse);
 
-      setMessages(updatedMessages);
-      setCurrResponse(ai_res.aiResponse);
-      // Start typing animation
-      setIsTyping(true);
-      setTypingText("");
-
-      if (overlayConvoId === -1) {
-        setOverlayChatTitle(ai_res.title);
-        setOverlayConvoId(ai_res.conversationId);
+        if (overlayConvoId === -1) {
+          setOverlayChatTitle(ai_res.title);
+          setOverlayConvoId(ai_res.conversationId);
+        }
       }
     } catch (error) {
       console.error("Error getting AI response:", error);
@@ -280,8 +346,8 @@ export const ChatView = ({
       setMessages(errorMessages);
     } finally {
       setTitleLoading(false);
-      // Always clear the thinking state
       setIsAIThinking(false);
+      setStreamingMsg("");
     }
   };
 
@@ -298,78 +364,19 @@ export const ChatView = ({
   }, [messages]);
 
   // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (typingRef.current.animationId !== null) {
-        cancelAnimationFrame(typingRef.current.animationId);
-      }
-    };
-  }, []);
 
-  // Typing animation effect
-  useEffect(() => {
-    if (isTyping && messages.length > 0) {
-      const lastMessage = messages[messages.length - 1];
-      if (lastMessage.sender === "ai") {
-        const fullText = lastMessage.text;
-        let currentIndex = 0;
-        let lastTime = 0;
-        const typingSpeed = 20; // 20ms per character for smooth typing for ai response
-
-        // Cancel any existing animation
-        if (typingRef.current.animationId !== null) {
-          cancelAnimationFrame(typingRef.current.animationId);
-        }
-
-        const typeNextChar = (currentTime: number) => {
-          if (!isTyping) return; // Stop if typing was cancelled
-
-          if (currentTime - lastTime >= typingSpeed) {
-            if (currentIndex < fullText.length) {
-              setTypingText(fullText.slice(0, currentIndex + 1));
-              currentIndex++;
-              lastTime = currentTime;
-            } else {
-              // Typing complete
-              setIsTyping(false);
-              setTypingText("");
-              typingRef.current.animationId = null;
-              return;
-            }
-          }
-
-          typingRef.current.animationId = requestAnimationFrame(typeNextChar);
-        };
-
-        typingRef.current.animationId = requestAnimationFrame(typeNextChar);
-      }
-    }
-
-    return () => {
-      // Cleanup on unmount or dependency change
-      if (typingRef.current.animationId !== null) {
-        cancelAnimationFrame(typingRef.current.animationId);
-        typingRef.current.animationId = null;
-      }
-    };
-  }, [isTyping, messages]);
+  // Removed typing animation effect
 
   const handleNewChat = () => {
     setMessages([]);
     setOverlayChatTitle("New Chat");
     setOverlayConvoId(-1);
     setChatInputText("");
-    setCurrResponse(""); // Clear the current response to hide the insert button
-    setIsTyping(false); // Stop typing animation
-    setTypingText("");
-    setIsInputTyping(false); // Reset input typing state
-    setSelectedTool(0); // Reset selected tool
-    setAttachedImage(null); // Clear attached image
-    setImagePreview(null); // Clear image preview
-    if (typingRef.current.animationId !== null) {
-      cancelAnimationFrame(typingRef.current.animationId);
-      typingRef.current.animationId = null;
-    }
+    setCurrResponse("");
+    setIsInputTyping(false);
+    setSelectedTool(0);
+    setAttachedImage(null);
+    setImagePreview(null);
   };
 
   // Handle image paste
@@ -406,28 +413,19 @@ export const ChatView = ({
   const handleWebSearch = async (userMsg: string, manualImage?: string) => {
     if (!userMsg.trim()) return;
 
-    // Stop any ongoing typing animation
-    setIsTyping(false);
-    setTypingText("");
-    if (typingRef.current.animationId !== null) {
-      cancelAnimationFrame(typingRef.current.animationId);
-      typingRef.current.animationId = null;
-    }
-
     const newMessages = [
       ...messages,
       {
         sender: "user" as const,
         text: userMsg,
         image: attachedImage || windowScreenshot || "",
-      }, // Normal message without prefix
+      },
     ];
     setMessages(newMessages);
     if (overlayConvoId === -1) setTitleLoading(true);
 
     setIsAIThinking(true);
 
-    // Use manual image if provided, otherwise use window screenshot (only if toggle is active)
     const imageToSend = manualImage || (isActive ? windowScreenshot : "") || "";
 
     try {
@@ -448,8 +446,6 @@ export const ChatView = ({
 
       setMessages(updatedMessages);
       setCurrResponse(ai_res.aiResponse);
-      setIsTyping(true);
-      setTypingText("");
 
       if (overlayConvoId === -1) {
         setOverlayChatTitle(ai_res.title);
@@ -476,28 +472,19 @@ export const ChatView = ({
   const handleSupermemory = async (userMsg: string, manualImage?: string) => {
     if (!userMsg.trim()) return;
 
-    // Stop any ongoing typing animation
-    setIsTyping(false);
-    setTypingText("");
-    if (typingRef.current.animationId !== null) {
-      cancelAnimationFrame(typingRef.current.animationId);
-      typingRef.current.animationId = null;
-    }
-
     const newMessages = [
       ...messages,
       {
         sender: "user" as const,
         text: userMsg,
         image: attachedImage || windowScreenshot || "",
-      }, // Normal message without prefix
+      },
     ];
     setMessages(newMessages);
     if (overlayConvoId === -1) setTitleLoading(true);
 
     setIsAIThinking(true);
 
-    // Use manual image if provided, otherwise use window screenshot (only if toggle is active)
     const imageToSend = manualImage || (isActive ? windowScreenshot : "") || "";
 
     try {
@@ -518,8 +505,6 @@ export const ChatView = ({
 
       setMessages(updatedMessages);
       setCurrResponse(ai_res.aiResponse);
-      setIsTyping(true);
-      setTypingText("");
 
       if (overlayConvoId === -1) {
         setOverlayChatTitle(ai_res.title);
@@ -549,7 +534,6 @@ export const ChatView = ({
     setChatInputText("");
     setIsInputTyping(false);
 
-    // Use selected tool if any
     if (selectedTool === 1) {
       handleWebSearch(userMsg, attachedImage || undefined);
     } else if (selectedTool === 2) {
@@ -558,7 +542,6 @@ export const ChatView = ({
       handleAIResponse(userMsg, attachedImage || undefined);
     }
 
-    // Reset tool selection and image after sending
     setSelectedTool(0);
     setAttachedImage(null);
     setImagePreview(null);
@@ -664,78 +647,92 @@ export const ChatView = ({
               <Loader2 className="animate-spin text-zinc-700" size={24} />
             </div>
           )}
-          {messages.map((msg, idx) => {
-            const isLastMessage = idx === messages.length - 1;
-            const isTypingThisMessage =
-              isTyping && msg.sender === "ai" && isLastMessage;
-            const displayText = isTypingThisMessage ? typingText : msg.text;
+          {/* Render all messages except the streaming one */}
+          {messages.map((msg, idx) => (
+            <div
+              key={idx}
+              className={`p-2 rounded-lg text-sm ${
+                msg.sender === "user"
+                  ? "bg-foreground dark:bg-zinc-950 dark:text-white font-medium  self-end text-right ml-auto w-fit max-w-[70%]"
+                  : "bg-zinc-200 dark:bg-zinc-950 dark:text-white  self-start text-left w-fit max-w-[300px]"
+              }`}
+            >
+              {msg.sender === "ai" ? (
+                <div className="prose prose-sm max-w-none prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-pre:hidden prose-code:hidden">
+                  {(() => {
+                    try {
+                      return (
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm, remarkBreaks]}
+                          components={{
+                            code: ({ className, children, ...props }: any) => {
+                              const inline = props.inline;
+                              return (
+                                <CodeBlock
+                                  className={className}
+                                  inline={inline}
+                                  {...props}
+                                >
+                                  {String(children).replace(/\n$/, "")}
+                                </CodeBlock>
+                              );
+                            },
+                          }}
+                        >
+                          {msg.text || ""}
+                        </ReactMarkdown>
+                      );
+                    } catch (error) {
+                      console.error("Markdown render error:", error);
+                      return (
+                        <div style={{ whiteSpace: "pre-wrap" }}>{msg.text}</div>
+                      );
+                    }
+                  })()}
+                </div>
+              ) : (
+                <div className="px-2 dark:text-zinc-300">{msg.text}</div>
+              )}
 
-            return (
-              <div
-                key={idx}
-                className={`p-2 rounded-lg text-sm ${
-                  msg.sender === "user"
-                    ? "bg-foreground dark:bg-zinc-950 dark:text-white font-medium  self-end text-right ml-auto w-fit max-w-[70%]"
-                    : "bg-zinc-200 dark:bg-zinc-950 dark:text-white  self-start text-left w-fit max-w-[300px]"
-                }`}
-              >
-                {msg.sender === "ai" ? (
-                  <div className="prose prose-sm max-w-none prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-pre:hidden prose-code:hidden">
-                    {(() => {
-                      try {
-                        return (
-                          <ReactMarkdown
-                            remarkPlugins={[remarkGfm, remarkBreaks]}
-                            components={{
-                              code: ({
-                                className,
-                                children,
-                                ...props
-                              }: any) => {
-                                const inline = props.inline;
-                                return (
-                                  <CodeBlock
-                                    className={className}
-                                    inline={inline}
-                                    {...props}
-                                  >
-                                    {String(children).replace(/\n$/, "")}
-                                  </CodeBlock>
-                                );
-                              },
-                            }}
-                          >
-                            {displayText || ""}
-                          </ReactMarkdown>
-                        );
-                      } catch (error) {
-                        console.error("Markdown render error:", error);
-                        // Fallback: Simple line break preservation
-                        return (
-                          <div style={{ whiteSpace: "pre-wrap" }}>
-                            {displayText}
-                          </div>
-                        );
-                      }
-                    })()}
-                  </div>
-                ) : (
-                  <div className="px-2 dark:text-zinc-300">{msg.text}</div>
-                )}
+              {/* Show image if exists */}
+              {msg.image && (
+                <div className="mt-2">
+                  <img
+                    src={msg.image}
+                    alt="User uploaded"
+                    className="w-[200px] rounded-lg "
+                  />
+                </div>
+              )}
+            </div>
+          ))}
 
-                {/* Show image if exists */}
-                {msg.image && (
-                  <div className="mt-2">
-                    <img
-                      src={msg.image}
-                      alt="User uploaded"
-                      className="w-[200px] rounded-lg "
-                    />
-                  </div>
-                )}
+          {/* Streaming AI message (if any) */}
+          {streamingMsg && (
+            <div className="p-2 rounded-lg text-sm bg-zinc-200 dark:bg-zinc-950 dark:text-white self-start text-left w-fit max-w-[300px]">
+              <div className="prose prose-sm max-w-none prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-pre:hidden prose-code:hidden">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm, remarkBreaks]}
+                  components={{
+                    code: ({ className, children, ...props }: any) => {
+                      const inline = props.inline;
+                      return (
+                        <CodeBlock
+                          className={className}
+                          inline={inline}
+                          {...props}
+                        >
+                          {String(children).replace(/\n$/, "")}
+                        </CodeBlock>
+                      );
+                    },
+                  }}
+                >
+                  {streamingMsg}
+                </ReactMarkdown>
               </div>
-            );
-          })}
+            </div>
+          )}
 
           {/* AI Thinking Animation - Simple Pulsing Dot */}
           <AnimatePresence mode="popLayout">
@@ -772,7 +769,6 @@ export const ChatView = ({
         {/* Input area with overlay icons */}
         <div className="relative">
           {/* Typing Icons - appear when user is typing */}
-          
 
           <div className="h-[50px]  text-foreground bg-background relative flex items-center shrink-0">
             <div className="relative h-full">
