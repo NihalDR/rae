@@ -822,35 +822,47 @@ export const ChatView = ({
           {/* Typing Icons - appear when user is typing */}
 
           <div className="h-[50px]  text-foreground bg-background relative flex items-center shrink-0">
-            <div className="relative h-full">
-              {/* <button
-                type="button"
-                className={`shrink-0 w-[120px] whitespace-nowrap bg-background h-full border-r border-border px-4 text-sm gap-2 flex items-center justify-center font-medium text-foreground select-none transition-colors hover:bg-foreground/10 ${dropdownOpen ? "bg-foreground/10" : ""}`}
-                onClick={() => setDropdownOpen((v) => !v)}
+            <div className="h-full w-fit relative  flex items-center p-1 ">
+              <OverlayButton
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDropdownOpen((v) => !v);
+                }}
+                className="dark:bg-zinc-950"
+                title={currentModel.value}
               >
-                {currentModel.value}
-                <ChevronDown size={16} />
-              </button>
-              {dropdownOpen && (
-                <div className="absolute left-0 bottom-full z-10 mb-1 w-40 bg-background border border-border rounded shadow-lg">
-                  {MODELS.map((model) => (
-                    <button
-                      key={model.value}
-                      className={`w-full text-left px-4 py-2 text-sm text-foreground transition-colors hover:bg-foreground/10 ${
-                        model.value === currentModel.value
-                          ? "font-bold bg-foreground/10"
-                          : ""
-                      }`}
-                      onClick={() => {
-                        setCurrentModel(model);
-                        setDropdownOpen(false);
-                      }}
-                    >
-                      {model.value}
-                    </button>
-                  ))}
-                </div>
-              )} */}
+                <SlidersIcon weight="bold" />
+              </OverlayButton>
+              <AnimatePresence>
+                {dropdownOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
+                    transition={{ duration: 0.12, ease: "easeInOut" }}
+                    className="absolute z-40 left-1 bottom-full mb-1 overflow-hidden rounded-lg shadow-xl shadow-black/40 dark:bg-zinc-950 border border-border min-w-[160px]"
+                  >
+                    <div className="flex flex-col py-1">
+                      {MODELS.map((model) => (
+                        <button
+                          key={model.value}
+                          className={`h-9 text-left px-3 text-sm transition-colors whitespace-nowrap dark:text-zinc-300 hover:dark:text-white hover:dark:bg-zinc-900 ${
+                            model.value === currentModel.value
+                              ? "font-semibold dark:bg-zinc-900"
+                              : ""
+                          }`}
+                          onClick={() => {
+                            setCurrentModel(model);
+                            setDropdownOpen(false);
+                          }}
+                        >
+                          {model.value}
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
             <div className="h-full w-fit relative  flex items-center p-1 ">
               <AnimatePresence>
