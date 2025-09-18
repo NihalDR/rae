@@ -298,10 +298,11 @@ const Chat: React.FC<ChatProps> = ({
                       <AnimatePresence>
                         {expanded && (
                           <motion.div
-                            initial={{ height: "0px" }}
-                            animate={{ height: modelsList.length * 40 + "px" }}
-                            exit={{ height: "0px" }}
-                            className="absolute bottom-full rounded-t-lg overflow-hidden   backdrop-blur-3xl bg-foreground/5 h-fit w-full flex flex-col"
+                            initial={{ opacity: 0, scaleY: 0.9 }}
+                            animate={{ opacity: 1, scaleY: 1 }}
+                            exit={{ opacity: 0, scaleY: 0.9 }}
+                            style={{ transformOrigin: "bottom center" }}
+                            className="absolute bottom-full mb-2 w-48 bg-card border border-border rounded-lg shadow-lg overflow-hidden z-[60]"
                           >
                             {modelsList.map((m) => (
                               <button
@@ -310,16 +311,27 @@ const Chat: React.FC<ChatProps> = ({
                                   setModel(m);
                                   setExpanded(false);
                                 }}
-                                className="h-[40px] hover:bg-foreground/10 shrink-0 px-4 flex  whitespace-nowrap items-center justify-start"
+                                className={`flex gap-3 text-sm w-full transition-colors duration-100 px-3 py-2.5 font-medium hover:bg-foreground/10 items-center ${
+                                  m.value === model.value
+                                    ? "bg-foreground/5 text-foreground"
+                                    : "text-foreground/70"
+                                }`}
                               >
-                                <div className="flex items-center gap-2">
-                                  <img
-                                    src={openaiLogo}
-                                    alt="OpenAI"
-                                    className="w-5 h-5 dark:invert"
-                                  />
-                                  <span>{m.value}</span>
-                                </div>
+                                <img
+                                  src={openaiLogo}
+                                  alt="OpenAI"
+                                  className="w-5 h-5 dark:invert"
+                                />
+                                <span>{m.value}</span>
+                                {m.value === model.value && (
+                                  <motion.div
+                                    initial={{ opacity: 0, scale: 0.8 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    className="ml-auto"
+                                  >
+                                    <CheckIcon className="" weight="bold" />
+                                  </motion.div>
+                                )}
                               </button>
                             ))}
                           </motion.div>
@@ -347,7 +359,7 @@ const Chat: React.FC<ChatProps> = ({
                     </div>
 
                     {/* Tools Dropdown */}
-                    <div className="h-full relative" ref={toolsDropdownRef}>
+                    <div className="h-full relative ml-2" ref={toolsDropdownRef}>
                       <AnimatePresence>
                         {toolsDropdownOpen && (
                           <motion.div
@@ -355,7 +367,7 @@ const Chat: React.FC<ChatProps> = ({
                             animate={{ opacity: 1, scaleY: 1 }}
                             exit={{ opacity: 0, scaleY: 0.9 }}
                             style={{ transformOrigin: "bottom center" }}
-                            className="absolute bottom-full mb-2 w-48 bg-card border border-border rounded-lg shadow-lg overflow-hidden z-50"
+                            className="absolute bottom-full mb-2 w-48 bg-card border border-border rounded-lg shadow-lg overflow-hidden z-[60]"
                           >
                             <button
                               onClick={() => {
@@ -509,10 +521,11 @@ const Chat: React.FC<ChatProps> = ({
                     <AnimatePresence>
                       {expanded && (
                         <motion.div
-                          initial={{ height: "0px" }}
-                          animate={{ height: modelsList.length * 40 + "px" }}
-                          exit={{ height: "0px" }}
-                          className="absolute z-[10000] bottom-full rounded-t-lg overflow-hidden   backdrop-blur-3xl bg-foreground/5 h-fit w-full flex flex-col"
+                          initial={{ opacity: 0, scaleY: 0.9 }}
+                          animate={{ opacity: 1, scaleY: 1 }}
+                          exit={{ opacity: 0, scaleY: 0.9 }}
+                          style={{ transformOrigin: "bottom center" }}
+                          className="absolute bottom-full mb-2 w-48 bg-card border border-border rounded-lg shadow-lg overflow-hidden z-50"
                         >
                           {modelsList.map((m) => (
                             <button
@@ -521,16 +534,27 @@ const Chat: React.FC<ChatProps> = ({
                                 setModel(m);
                                 setExpanded(false);
                               }}
-                              className="h-[40px] hover:bg-foreground/10 shrink-0 px-4 flex  whitespace-nowrap items-center justify-start"
+                              className={`flex gap-3 text-sm w-full transition-colors duration-100 px-3 py-2.5 font-medium hover:bg-foreground/10 items-center ${
+                                m.value === model.value
+                                  ? "bg-foreground/5 text-foreground"
+                                  : "text-foreground/70"
+                              }`}
                             >
-                              <div className="flex items-center gap-2">
-                                <img
-                                  src={openaiLogo}
-                                  alt="OpenAI"
-                                  className="w-5 h-5 dark:invert"
-                                />
-                                <span>{m.value}</span>
-                              </div>
+                              <img
+                                src={openaiLogo}
+                                alt="OpenAI"
+                                className="w-5 h-5 dark:invert"
+                              />
+                              <span>{m.value}</span>
+                              {m.value === model.value && (
+                                <motion.div
+                                  initial={{ opacity: 0, scale: 0.8 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  className="ml-auto"
+                                >
+                                  <CheckIcon className="" weight="bold" />
+                                </motion.div>
+                              )}
                             </button>
                           ))}
                         </motion.div>
@@ -558,7 +582,7 @@ const Chat: React.FC<ChatProps> = ({
                   </div>
 
                   {/* Tools Dropdown - Expanded View */}
-                  <div className="h-full relative" ref={toolsDropdownRef2}>
+                  <div className="h-full relative ml-2" ref={toolsDropdownRef2}>
                     <AnimatePresence>
                       {toolsDropdownOpen && (
                         <motion.div
