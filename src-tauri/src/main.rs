@@ -8,7 +8,7 @@ mod audio_client;
 
 // Import required traits
 use audio_client::AudioState;
-use image as img_crate;
+
 use std::sync::Mutex;
 use tauri::image::Image;
 use tauri::menu::{Menu, MenuItemBuilder};
@@ -143,7 +143,7 @@ app.manage(AudioState(Mutex::new(false)));
 
             // Intercept main window close and hide to tray instead
             if let Some(main_window) = app.get_webview_window("main") {
-                let app_handle_clone = app_handle.clone();
+                let _app_handle_clone = app_handle.clone();
                 let app_handle_for_tray = app.handle().clone();
                 main_window.on_window_event(move |event| {
                     if let tauri::WindowEvent::CloseRequested { api, .. } = event {

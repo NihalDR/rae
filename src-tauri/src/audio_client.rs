@@ -6,6 +6,9 @@ use tokio_tungstenite::connect_async;
 use tungstenite::protocol::Message;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use serde_json::json;
+use base64::{Engine, engine::general_purpose};
+
+pub struct AudioState(pub Mutex<bool>);
 
 fn float_to_pcm16(input: &[f32]) -> Vec<u8> {
     let mut out = Vec::with_capacity(input.len() * 2);
@@ -55,17 +58,21 @@ pub async fn run_audio_client() {
     tokio::spawn(async move {
         loop {
             send_interval.tick().await;
-            let mut buf = buffer_clone.lock().unwrap();
-            if buf.is_empty() { continue; }
+            let pcm_data = {
+                let mut buf = buffer_clone.lock().unwrap();
+                if buf.is_empty() { continue; }
 
-            let pcm = float_to_pcm16(&buf);
-            let base64_audio = base64::encode(&pcm);
+                let pcm = float_to_pcm16(&buf);
+                buf.clear();
+                pcm
+            };
 
+            let base64_audio = general_purpose::STANDARD.encode(&pcm_data);
             let msg = json!({ "audio": base64_audio });
-            if write.send(Message::Text(msg.to_string())).await.is_err() {
+
+            if write.send(Message::text(msg.to_string())).await.is_err() {
                 break;
             }
-            buf.clear();
         }
     });
 
@@ -95,4 +102,12 @@ pub async fn run_audio_client() {
             }
         }
     }
+}
+
+#[tauri::command]
+pub async fn start_audio_client() -> Result<String, String> {
+    tokio::spawn(async {
+        run_audio_client().await;
+    });
+    Ok("Audio client started".to_string())
 }
