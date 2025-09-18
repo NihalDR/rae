@@ -39,6 +39,7 @@ import { animations } from "@/constants/animations";
 import { invoke } from "@tauri-apps/api/core";
 import { useNoteStore } from "@/store/noteStore";
 import animatedUnscreenGif from "../../../assets/animated-gifs01-unscreen.gif";
+import openaiLogo from "../../../assets/ai/OpenAI-black-monoblossom.svg";
 import { OverlayButton } from "./OverlayComponents";
 import {
   ArrowElbowDownLeftIcon,
@@ -51,7 +52,6 @@ import {
   GearSixIcon,
   GlobeSimpleIcon,
   SlidersHorizontalIcon,
-  SlidersIcon,
   TrashIcon,
   EyeSlashIcon,
 } from "@phosphor-icons/react";
@@ -985,7 +985,11 @@ export const ChatView = ({
                     className="dark:bg-zinc-950"
                     title={currentModel.value}
                   >
-                    <SlidersIcon weight="bold" />
+                    <img
+                      src={openaiLogo}
+                      alt="OpenAI"
+                      className="w-5 h-5 dark:invert"
+                    />
                   </OverlayButton>
                   <AnimatePresence>
                     {dropdownOpen && (
@@ -1010,7 +1014,14 @@ export const ChatView = ({
                                 setDropdownOpen(false);
                               }}
                             >
-                              {model.value}
+                              <div className="flex items-center gap-2">
+                                <img
+                                  src={openaiLogo}
+                                  alt="OpenAI"
+                                  className="w-5 h-5 dark:invert"
+                                />
+                                <span>{model.value}</span>
+                              </div>
                             </button>
                           ))}
                         </div>
