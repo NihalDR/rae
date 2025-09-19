@@ -1284,10 +1284,6 @@ export const ChatView = ({
                             >
                               Stealth Mode
                             </Option>
-                            <button className="flex gap-2 text-sm w-full transition-colors duration-100 px-2 py-1 dark:text-zinc-400 font-medium hover:dark:text-white hover:dark:bg-zinc-900 rounded-md items-center">
-                              <GearSixIcon className="text-lg" />
-                              More Settings
-                            </button>
                           </div>
                         </motion.div>
                       </>

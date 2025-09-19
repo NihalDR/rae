@@ -45,15 +45,17 @@ interface ChatProps {
   onSend?: (msg: string, image?: string) => void;
   onWebSearch?: (msg: string, image?: string) => void;
   onSupermemory?: (msg: string, image?: string) => void;
+  onImageGeneration?: (msg: string, image?: string) => void;
   currentModel?: { label: string; value: string };
   setCurrentModel?: (model: { label: string; value: string }) => void;
   models?: { label: string; value: string }[];
   initialMessage?: string | null;
   onTypingChange?: (isTyping: boolean) => void;
   onMessageChange?: (message: string) => void;
-  selectedTool?: 0 | 1 | 2;
-  onToolChange?: (tool: 0 | 1 | 2) => void;
+  selectedTool?: 0 | 1 | 2 | 4;
+  onToolChange?: (tool: 0 | 1 | 2 | 4) => void;
   initial?: boolean;
+  onReferenceImage?: (imageBase64: string) => void;
 }
 
 const Chat: React.FC<ChatProps> = ({
@@ -61,6 +63,7 @@ const Chat: React.FC<ChatProps> = ({
   onSend,
   onWebSearch,
   onSupermemory,
+  onImageGeneration,
   currentModel,
   setCurrentModel,
   models: modelsProp,
@@ -70,6 +73,7 @@ const Chat: React.FC<ChatProps> = ({
   selectedTool = 0,
   onToolChange,
   initial = false,
+  onReferenceImage,
 }) => {
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
   const [message, setMessage] = useState(initialMessage || "");
@@ -164,6 +168,7 @@ const Chat: React.FC<ChatProps> = ({
 
   const handleSupermemory = () => {
     if (!message.trim()) return;
+    if (!init) setInit(true);
     if (onSupermemory) onSupermemory(message, attachedImage || undefined);
     setMessage("");
     setIsTyping(false);
@@ -171,7 +176,85 @@ const Chat: React.FC<ChatProps> = ({
     setImagePreview(null);
     if (chatInputRef.current) {
       chatInputRef.current.value = "";
-      autosize.update(chatInputRef.current); 
+      //   autosize.update(chatInputRef.current);
+    }
+  };
+
+  const handleImageGeneration = () => {
+    if (!message.trim()) return;
+    if (!init) setInit(true);
+    if (onImageGeneration)
+      onImageGeneration(message, attachedImage || undefined);
+    setMessage("");
+    setIsTyping(false);
+    setAttachedImage(null);
+    setImagePreview(null);
+    if (chatInputRef.current) {
+      chatInputRef.current.value = "";
+      //   autosize.update(chatInputRef.current);
+    }
+  };
+
+  // Handle image reference event from parent
+  useEffect(() => {
+    const handleReferenceImage = (event: CustomEvent) => {
+      const { imageBase64 } = event.detail;
+      setAttachedImage(imageBase64);
+      setImagePreview(imageBase64);
+    };
+
+    window.addEventListener(
+      "referenceImage",
+      handleReferenceImage as EventListener,
+    );
+    return () => {
+      window.removeEventListener(
+        "referenceImage",
+        handleReferenceImage as EventListener,
+      );
+    };
+  }, []);
+
+  const getPlaceholderText = () => {
+    if (attachedImage) {
+      return "Describe what you want to know about this image...";
+    }
+
+    switch (selectedTool) {
+      case 1:
+        return "🌐 Web search me...";
+      case 2:
+        return "🧠 Super memory search...";
+      case 4:
+        return "🎨 Generate or modify image...";
+      default:
+        return "Enter your message or paste a screenshot";
+    }
+  };
+
+  const handleReferenceImage = (imageBase64: string) => {
+    setAttachedImage(imageBase64);
+    setImagePreview(imageBase64);
+
+    // If not already on image generation tool, switch to it for better workflow
+    if (selectedTool !== 4 && onToolChange) {
+      onToolChange(4);
+    }
+
+    if (onReferenceImage) {
+      onReferenceImage(imageBase64);
+    }
+  };
+
+  const handleSendMessage = () => {
+    if (selectedTool === 1) {
+      handleWebSearch();
+    } else if (selectedTool === 2) {
+      handleSupermemory();
+    } else if (selectedTool === 4) {
+      handleImageGeneration();
+    } else {
+      handleSend();
     }
   };
 
@@ -243,55 +326,72 @@ const Chat: React.FC<ChatProps> = ({
               <div className="w-full">
                 <div className="bg-zinc-900/50 w-full h-fit border flex flex-col transition-all rounded-lg border-border group focus-within:border-foreground/20 ">
                   <div className="relative">
-                    <textarea
-                      onChange={(e) => setMessage(e.target.value)}
-                      onPaste={handlePaste}
-                      ref={chatInputRef}
-                      placeholder={
-                        attachedImage
-                          ? "Describe what you want to know about this image..."
-                          : "Enter your message or paste a screenshot"
-                      }
-                      name=""
-                      id=""
-                      className="size-full min-h-[60px] placeholder:text-foreground/40 resize-none outline-none text-sm p-2 pr-12"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          if (!disabled) handleSend();
-                        }
-                      }}
-                      value={message}
-                    ></textarea>
-
-                    {/* Image attachment indicator */}
+                    {/* Tool indicator */}
                     <AnimatePresence>
-                      {imagePreview && (
+                      {selectedTool > 0 && (
                         <motion.div
                           initial={{ opacity: 0, scale: 0.8 }}
                           animate={{ opacity: 1, scale: 1 }}
                           exit={{ opacity: 0, scale: 0.8 }}
-                          className="absolute top-2 right-2 flex items-center gap-2"
+                          className="absolute left-2 top-2 z-10"
                         >
-                          <div className="relative group">
-                            <img
-                              src={imagePreview}
-                              alt="Attached screenshot"
-                              className="w-8 h-8 object-cover rounded border border-border cursor-pointer"
-                              title="Screenshot attached - Click to remove"
-                              onClick={clearImage}
-                            />
-                            <button
-                              onClick={clearImage}
-                              className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                              title="Remove image"
-                            >
-                              ×
-                            </button>
+                          <div className="text-red-500">
+                            {selectedTool === 1 && <Globe size={18} />}
+                            {selectedTool === 2 && <Brain size={18} />}
+                            {selectedTool === 4 && <Image size={18} />}
                           </div>
                         </motion.div>
                       )}
                     </AnimatePresence>
+                    <div className="flex">
+                      <div className="flex-1 relative">
+                        <textarea
+                          onChange={(e) => setMessage(e.target.value)}
+                          onPaste={handlePaste}
+                          ref={chatInputRef}
+                          placeholder={getPlaceholderText()}
+                          name=""
+                          id=""
+                          className={`size-full min-h-[60px] placeholder:text-foreground/40 resize-none outline-none text-sm pr-12 ${selectedTool > 0 ? "pl-12 pt-2 pb-2" : "p-2"}`}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              if (!disabled) handleSendMessage();
+                            }
+                          }}
+                          value={message}
+                        ></textarea>
+                      </div>
+
+                      {/* Image attachment indicator */}
+                      <AnimatePresence>
+                        {imagePreview && (
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.8 }}
+                            className="absolute top-2 right-2 flex items-center gap-2"
+                          >
+                            <div className="relative group">
+                              <img
+                                src={imagePreview}
+                                alt="Attached screenshot"
+                                className="w-8 h-8 object-cover rounded border border-border cursor-pointer"
+                                title="Screenshot attached - Click to remove"
+                                onClick={clearImage}
+                              />
+                              <button
+                                onClick={clearImage}
+                                className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Remove image"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
                   </div>
                   <div className=" text-sm shrink-0 w-full flex h-[40px] p-1">
                     <div className="h-full w-fit relative">
@@ -359,7 +459,10 @@ const Chat: React.FC<ChatProps> = ({
                     </div>
 
                     {/* Tools Dropdown */}
-                    <div className="h-full relative ml-2" ref={toolsDropdownRef}>
+                    <div
+                      className="h-full relative ml-2"
+                      ref={toolsDropdownRef}
+                    >
                       <AnimatePresence>
                         {toolsDropdownOpen && (
                           <motion.div
@@ -415,6 +518,29 @@ const Chat: React.FC<ChatProps> = ({
                                 </motion.div>
                               )}
                             </button>
+                            <button
+                              onClick={() => {
+                                onToolChange?.(selectedTool === 4 ? 0 : 4);
+                                setToolsDropdownOpen(false);
+                              }}
+                              className={`flex gap-3 text-sm w-full transition-colors duration-100 px-3 py-2.5 font-medium hover:bg-foreground/10 items-center ${
+                                selectedTool === 4
+                                  ? "bg-foreground/5 text-foreground"
+                                  : "text-foreground/70"
+                              }`}
+                            >
+                              <Image className="text-lg" />
+                              Image Generation
+                              {selectedTool === 4 && (
+                                <motion.div
+                                  initial={{ opacity: 0, scale: 0.8 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  className="ml-auto"
+                                >
+                                  <CheckIcon className="" weight="bold" />
+                                </motion.div>
+                              )}
+                            </button>
                           </motion.div>
                         )}
                       </AnimatePresence>
@@ -443,7 +569,7 @@ const Chat: React.FC<ChatProps> = ({
                         className={`rounded-lg size-full dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-colors duration-100 p-0 flex items-center justify-center ${
                           disabled && "dark:bg-zinc-800  !text-foreground/20"
                         }`}
-                        onClick={handleSend}
+                        onClick={handleSendMessage}
                       >
                         <ArrowElbowDownLeftIcon weight="bold"></ArrowElbowDownLeftIcon>
                       </button>
