@@ -30,6 +30,8 @@ import {
   ArrowRight,
   Globe,
   Brain,
+  Copy,
+  Image,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -234,7 +236,11 @@ export const ChatView = ({
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [stealthMode, setStealthMode] = useState<boolean>(false);
-
+  const [lastImage, setLastImage] = useState<string>("");
+  const [hoveredImageIndex, setHoveredImageIndex] = useState<number | null>(
+    null,
+  );
+  const [imageReferenced, setImageReferenced] = useState<boolean>(false);
   // Refs for scrolling
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
@@ -508,6 +514,21 @@ export const ChatView = ({
   const clearImage = () => {
     setAttachedImage(null);
     setImagePreview(null);
+  };
+
+  const handleReferenceImage = (imageBase64: string) => {
+    setAttachedImage(imageBase64);
+    setImagePreview(imageBase64);
+
+    // If not already on image generation tool, switch to it for better workflow
+    // if (selectedTool !== 4) {
+    //   setSelectedTool(4);
+    // }
+
+    setImageReferenced(true);
+    // Clear the notification after 3 seconds for image generation, 2 for others
+    const timeout = selectedTool === 4 ? 3000 : 2000;
+    setTimeout(() => setImageReferenced(false), timeout);
   };
 
   // Handler for web search
@@ -905,6 +926,23 @@ export const ChatView = ({
               </div>
             </div>
 
+            {/* Image referenced notification */}
+            <AnimatePresence>
+              {imageReferenced && (
+                <motion.div
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="absolute top-2 right-2 z-50 bg-green-500 text-white px-3 py-2 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2"
+                >
+                  <Image size={16} />
+                  {selectedTool === 4
+                    ? "Image ready for modification"
+                    : "Image referenced for next message"}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* Messages area */}
             <div className="flex-1 overflow-y-auto p-2 space-y-1 scrollbar-hide relative flex flex-col">
               {loadingMessages && (
@@ -981,12 +1019,48 @@ export const ChatView = ({
 
                   {/* Show image if exists */}
                   {msg.image && (
-                    <div className="mt-2">
+                    <div
+                      className="mt-2 relative inline-block"
+                      onMouseEnter={() =>
+                        msg.sender === "ai" ? setHoveredImageIndex(idx) : null
+                      }
+                      onMouseLeave={() => setHoveredImageIndex(null)}
+                    >
                       <img
                         src={msg.image}
-                        alt="User uploaded"
-                        className="w-[200px] rounded-lg "
+                        alt={
+                          msg.sender === "user"
+                            ? "User uploaded"
+                            : "AI generated"
+                        }
+                        className={`w-[200px] rounded-lg transition-all duration-200 ${
+                          msg.sender === "ai"
+                            ? "cursor-pointer hover:scale-[1.02] hover:shadow-lg"
+                            : ""
+                        }`}
                       />
+
+                      {/* Hover overlay with reference button for AI images */}
+                      {msg.sender === "ai" && hoveredImageIndex === idx && (
+                        <div className="absolute inset-0 bg-black bg-opacity-50 rounded-lg flex items-center justify-center transition-all duration-200 animate-in fade-in-0">
+                          <button
+                            onClick={() => handleReferenceImage(msg.image)}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 text-sm font-medium shadow-lg transform ${
+                              selectedTool === 4
+                                ? "bg-blue-500 text-white hover:bg-blue-600 hover:shadow-xl"
+                                : "bg-white text-black hover:bg-gray-100 hover:shadow-xl"
+                            }`}
+                            title={
+                              selectedTool === 4
+                                ? "Use this image for further modifications"
+                                : "Reference this image in your next message"
+                            }
+                          >
+                            <Image size={16} />
+                            {selectedTool === 4 ? "Modify" : "Reference"}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
