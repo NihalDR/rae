@@ -516,6 +516,23 @@ export const ChatView = ({
     setImagePreview(null);
   };
 
+  const getPlaceholderText = () => {
+    if (attachedImage) {
+      return "Describe what you want to know about this image...";
+    }
+
+    switch (selectedTool) {
+      case 1:
+        return "Web search me...";
+      case 2:
+        return "Super memory search...";
+      case 4:
+        return "Generate or modify image...";
+      default:
+        return "Enter your message or paste a screenshot";
+    }
+  };
+
   const handleReferenceImage = (imageBase64: string) => {
     setAttachedImage(imageBase64);
     setImagePreview(imageBase64);
@@ -1288,7 +1305,26 @@ export const ChatView = ({
                   </OverlayButton>
                 </div>
                 <div className="w-full h-full py-1 ">
-                  <div className="relative size-full dark:bg-zinc-950 focus-within:dark:bg-zinc-950 rounded-lg transition-all duration-100 border-2 dark:border-zinc-950 focus-within:dark:border-zinc-900">
+                  <div className="relative  size-full dark:bg-zinc-950 focus-within:dark:bg-zinc-950 rounded-lg transition-all duration-100 border-2 dark:border-zinc-950 focus-within:dark:border-zinc-900">
+                    {/* Tool indicator */}
+                    <AnimatePresence>
+                      {selectedTool > 0 && (
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.8 }}
+                          className=" absolute left-2 top-1/2 transform -translate-y-1/2 z-10"
+                        >
+                          <div className="text-red-500">
+                            {selectedTool === 1 && (
+                              <GlobeSimpleIcon size={24} />
+                            )}
+                            {selectedTool === 2 && <BrainIcon size={24} />}
+                            {selectedTool === 4 && <Pencil size={24} />}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                     <input
                       type="text"
                       value={chatInputText}
@@ -1302,12 +1338,8 @@ export const ChatView = ({
                         if (e.key === "Enter" && chatInputText.trim())
                           handleSendMessage();
                       }}
-                      placeholder={
-                        attachedImage
-                          ? "Describe what you want to know about this image..."
-                          : "Enter your message or paste a screenshot"
-                      }
-                      className="w-full px-4 dark:focus:placeholder:text-zinc-400/0 placeholder:transition-colors h-full bg-transparent text-foreground placeholder:text-foreground/50 text-sm outline-none pr-12"
+                      placeholder={getPlaceholderText()}
+                      className={`w-full dark:focus:placeholder:text-zinc-400/0 placeholder:transition-colors h-full bg-transparent text-foreground placeholder:text-foreground/50 text-sm outline-none pr-12 ${selectedTool > 0 ? "pl-12" : "px-4"}`}
                     />
 
                     {/* Image attachment indicator */}
