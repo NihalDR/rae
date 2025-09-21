@@ -1409,13 +1409,10 @@ const Overlay = () => {
         <AnimatePresence mode="sync">
           {chatOpen && !isMaximized && (
             <ChatView
-              setChatOpen={setChatOpen}
               onClose={handleCloseChatClick}
               initialMessage={initialChatMessage}
               initialAttachedImage={initialAttachedImage}
               smoothResize={smoothResize}
-              showChat={showChat}
-              setShowChat={setShowChat}
               windowName={windowName}
               windowIcon={windowIcon}
               windowHwnd={windowHwnd}
