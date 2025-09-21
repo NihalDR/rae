@@ -35,6 +35,7 @@ import { animations } from "@/constants/animations";
 import { invoke } from "@tauri-apps/api/core";
 import { useNoteStore } from "@/store/noteStore";
 import { extractInsertableContent, InsertionContext, generateContextAwarePrompt } from "@/utils/textExtraction";
+import WebSearchAnimation from "./WebSearchAnimation";
 // Passing OpenAI logo SVG as a data URL
 const openaiLogo = `data:image/svg+xml;base64,${btoa(`<svg width="721" height="721" viewBox="0 0 721 721" fill="none" xmlns="http://www.w3.org/2000/svg">
 <g clip-path="url(#clip0_1637_2934)">
@@ -207,6 +208,8 @@ export const ChatView = ({
   const [currResponse, setCurrResponse] = useState<string>("");
   const [streamingMsg, setStreamingMsg] = useState<string>("");
   const [isAIThinking, setIsAIThinking] = useState(false);
+  const [isWebSearching, setIsWebSearching] = useState(false);
+  const [isImageGenerating, setIsImageGenerating] = useState(false);
   // Removed typing animation logic
   const [isInputTyping, setIsInputTyping] = useState(false);
   const [selectedTool, setSelectedTool] = useState<0 | 1 | 2 | 4>(0); // 0=none, 1=web search, 2=supermemory, 4= image generation
@@ -564,7 +567,7 @@ export const ChatView = ({
     setMessages(newMessages);
     if (overlayConvoId === -1) setTitleLoading(true);
 
-    setIsAIThinking(true);
+    setIsWebSearching(true);
 
     const imageToSend = manualImage || (isActive ? windowScreenshot : "") || "";
 
@@ -604,7 +607,7 @@ export const ChatView = ({
       setMessages(errorMessages);
     } finally {
       setTitleLoading(false);
-      setIsAIThinking(false);
+      setIsWebSearching(false);
     }
   };
 
@@ -691,7 +694,7 @@ export const ChatView = ({
     setMessages(newMessages);
     if (overlayConvoId === -1) setTitleLoading(true);
 
-    setIsAIThinking(true);
+    setIsImageGenerating(true);
 
     const imageToSend = manualImage || (isActive ? windowScreenshot : "") || "";
 
@@ -733,7 +736,7 @@ export const ChatView = ({
       setMessages(errorMessages);
     } finally {
       setTitleLoading(false);
-      setIsAIThinking(false);
+      setIsImageGenerating(false);
     }
   };
   const handleSendMessage = () => {
@@ -1240,9 +1243,41 @@ export const ChatView = ({
                 </div>
               )}
 
+              {/* Web Search Animation */}
+              <WebSearchAnimation isSearching={isWebSearching} />
+
+              {/* Image Generation Animation */}
+              <AnimatePresence mode="popLayout">
+                {isImageGenerating && (
+                  <motion.div
+                    className="flex gap-2 mt-2 mx-2 dark:text-zinc-200  font-medium items-center text-sm h-fit"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <motion.div
+                      initial={{ borderRadius: "0%", rotate: "90deg" }}
+                      animate={{
+                        borderRadius: ["0%", "50%", "0%"],
+                        rotate: ["90deg", "180deg", "270deg"],
+                      }}
+                      transition={{
+                        duration: 1,
+                        ease: "linear",
+                        repeat: Infinity,
+                        repeatType: "loop",
+                      }}
+                      className="self-start flex items-center relative border-[3px] border-surface size-[20px] justify-center"
+                    ></motion.div>
+
+                    <div className="animate-pulse">Rae is drawing...</div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               {/* AI Thinking Animation - Simple Pulsing Dot */}
               <AnimatePresence mode="popLayout">
-                {isAIThinking && (
+                {isAIThinking && !isWebSearching && !isImageGenerating && (
                   <motion.div
                     className="flex gap-2 mt-2 mx-2 dark:text-zinc-200  font-medium items-center text-sm h-fit"
                     initial={{ opacity: 0 }}
