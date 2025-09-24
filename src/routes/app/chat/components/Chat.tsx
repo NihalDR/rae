@@ -222,11 +222,11 @@ const Chat: React.FC<ChatProps> = ({
 
     switch (selectedTool) {
       case 1:
-        return "🌐 Web search me...";
+        return "Web search me...";
       case 2:
-        return "🧠 Super memory search...";
+        return "Super memory search...";
       case 4:
-        return "🎨 Generate or modify image...";
+        return "Generate or modify image...";
       default:
         return "Enter your message or paste a screenshot";
     }

@@ -13,6 +13,7 @@ const GENERIC_SITE_ICON = "data:image/svg+xml;base64," + btoa(`
 interface WebSearchAnimationProps {
   isSearching: boolean;
   searchQuery?: string;
+  isResponseStreaming?: boolean;
   onSearchSiteFound?: (site: { site: string; domain: string; favicon: string; title: string; link: string }) => void;
 }
 
@@ -24,31 +25,43 @@ interface SearchSite {
   link: string;
 }
 
-export const WebSearchAnimation = ({ isSearching, searchQuery, onSearchSiteFound }: WebSearchAnimationProps) => {
+export const WebSearchAnimation = ({ isSearching, searchQuery, isResponseStreaming = false, onSearchSiteFound }: WebSearchAnimationProps) => {
+  console.log("WebSearchAnimation rendered:", { isSearching, searchQuery, isResponseStreaming });
   const [currentSiteIndex, setCurrentSiteIndex] = useState(0);
   const [realSearchSites, setRealSearchSites] = useState<SearchSite[]>([]);
   const [usingRealData, setUsingRealData] = useState(false);
 
   // Add a site from real search results
   const addRealSearchSite = (site: SearchSite) => {
+    console.log("addRealSearchSite called with:", site);
+    console.log("Favicon URL:", site.favicon);
     setRealSearchSites(prev => {
       const exists = prev.find(s => s.domain === site.domain);
       if (!exists) {
+        console.log("Adding real site:", site.site, "with favicon:", site.favicon);
+        // Replace demo sites with real ones as they come in
         const newSites = [...prev, site];
+        // Set to show the newly added site
         setCurrentSiteIndex(newSites.length - 1);
+        setUsingRealData(true);
         return newSites;
+      } else {
+        console.log("Site already exists:", site.site);
       }
       return prev;
     });
-    setUsingRealData(true);
   };
 
   // Expose the addRealSearchSite function to parent
   React.useEffect(() => {
-    if (onSearchSiteFound) {
-      (window as any).addRealSearchSite = addRealSearchSite;
-    }
-  }, [onSearchSiteFound]);
+    console.log("Setting up addRealSearchSite on window");
+    (window as any).addRealSearchSite = addRealSearchSite;
+
+    // Cleanup function to remove from window when component unmounts
+    return () => {
+      (window as any).addRealSearchSite = undefined;
+    };
+  }, []);
 
   useEffect(() => {
     if (!isSearching) {
@@ -58,9 +71,22 @@ export const WebSearchAnimation = ({ isSearching, searchQuery, onSearchSiteFound
       return;
     }
 
-    // Only show "Rae is searching..." when no real data is available yet
-    // Real-time data will be populated via the addRealSearchSite function
-  }, [isSearching, searchQuery, usingRealData]);
+    // Reset for new search - wait for real sites from backend
+    setRealSearchSites([]);
+    setUsingRealData(false);
+    setCurrentSiteIndex(0);
+  }, [isSearching, searchQuery]);
+
+  // Cycle through sites after we have some real data, but not during streaming
+  useEffect(() => {
+    if (usingRealData && realSearchSites.length > 1 && !isResponseStreaming) {
+      const interval = setInterval(() => {
+        setCurrentSiteIndex(prev => (prev + 1) % realSearchSites.length);
+      }, 1000); // Change site every 1 second
+
+      return () => clearInterval(interval);
+    }
+  }, [usingRealData, realSearchSites.length, isResponseStreaming]);
 
   if (!isSearching) return null;
 
@@ -73,77 +99,84 @@ export const WebSearchAnimation = ({ isSearching, searchQuery, onSearchSiteFound
         exit={{ opacity: 0 }}
         transition={{ duration: 0.2 }}
       >
-        {/* Main Rae logo with searching animation */}
+        {/* Main Rae logo with searching animation and site icons */}
         <div className="flex gap-3 items-center">
-          <motion.div
-            initial={{ borderRadius: "0%", rotate: "90deg" }}
-            animate={{
-              borderRadius: ["0%", "50%", "0%"],
-              rotate: ["90deg", "180deg", "270deg"],
-            }}
-            transition={{
-              duration: 1,
-              ease: "linear",
-              repeat: Infinity,
-              repeatType: "loop",
-            }}
-            className="self-start flex items-center relative border-[3px] border-surface size-[20px] justify-center"
-          ></motion.div>
+          {!isResponseStreaming && (
+            <motion.div
+              initial={{ borderRadius: "0%", rotate: "90deg" }}
+              animate={{
+                borderRadius: ["0%", "50%", "0%"],
+                rotate: ["90deg", "180deg", "270deg"],
+              }}
+              transition={{
+                duration: 1,
+                ease: "linear",
+                repeat: Infinity,
+                repeatType: "loop",
+              }}
+              className="self-start flex items-center relative border-[3px] border-surface size-[20px] justify-center"
+            ></motion.div>
+          )}
 
           <div className="flex flex-col gap-1">
-            <div className="animate-pulse font-semibold">Rae is searching...</div>
+            {/* Rae is searching text with site icons */}
+            <div className="flex items-center gap-2">
+              {!isResponseStreaming && (
+                <span className="animate-pulse font-semibold">Rae is searching...</span>
+              )}
 
-            {/* Currently searching site - only show if we have real data */}
+              {/* Show site icons when we have real data but not during response streaming */}
+              <AnimatePresence mode="popLayout">
+                {usingRealData && realSearchSites.length > 0 && !isResponseStreaming && (
+                  <motion.div
+                    className="flex items-center gap-1"
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    {realSearchSites.slice(0, 5).map((site, index) => (
+                      <motion.div
+                        key={`${site.domain}-${index}`}
+                        animate={index === currentSiteIndex % realSearchSites.length ? { scale: [1, 1.2, 1] } : { scale: 1 }}
+                        transition={{ duration: 0.6, repeat: index === currentSiteIndex % realSearchSites.length ? Infinity : 0, repeatType: "loop" }}
+                        className="size-5 flex items-center justify-center rounded-sm overflow-hidden border border-zinc-600/20"
+                        title={site.site}
+                      >
+                        <img
+                          src={site.favicon}
+                          alt={site.site}
+                          className="size-full object-contain"
+                          onLoad={() => console.log("Favicon loaded successfully:", site.favicon)}
+                          onError={(e) => {
+                            console.error("Favicon failed to load:", site.favicon, "falling back to generic icon");
+                            // Fallback to the generic icon if favicon fails to load
+                            (e.target as HTMLImageElement).src = GENERIC_SITE_ICON;
+                          }}
+                        />
+                      </motion.div>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Currently searching site name - show if we have real data and not during response streaming */}
             <AnimatePresence mode="wait">
-              {usingRealData && realSearchSites[currentSiteIndex] ? (
+              {usingRealData && realSearchSites[currentSiteIndex] && !isResponseStreaming ? (
                 <motion.div
                   key={`real-${currentSiteIndex}`}
                   className="flex items-center gap-2 text-xs"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
                   transition={{ duration: 0.3 }}
                 >
-                  <motion.div
-                    animate={{ scale: [1, 1.1, 1] }}
-                    transition={{ duration: 0.6, repeat: Infinity, repeatType: "loop" }}
-                    className="size-4 flex items-center justify-center"
-                  >
-                    <img
-                      src={realSearchSites[currentSiteIndex].favicon}
-                      alt={realSearchSites[currentSiteIndex].site}
-                      className="size-full object-contain"
-                      onError={(e) => {
-                        // Fallback to the generic icon if favicon fails to load
-                        (e.target as HTMLImageElement).src = GENERIC_SITE_ICON;
-                      }}
-                    />
-                  </motion.div>
                   <span className="text-zinc-400">
                     Searching {realSearchSites[currentSiteIndex].site}...
                   </span>
                 </motion.div>
-              ) : (
-                <motion.div
-                  key="loading"
-                  className="flex items-center gap-2 text-xs"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                    className="size-4 flex items-center justify-center"
-                  >
-                    <div className="size-full border-2 border-zinc-400 border-t-transparent rounded-full"></div>
-                  </motion.div>
-                  <span className="text-zinc-400 animate-pulse">
-                    Finding relevant sources...
-                  </span>
-                </motion.div>
-              )}
+              ) : null}
             </AnimatePresence>
           </div>
         </div>

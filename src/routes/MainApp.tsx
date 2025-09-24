@@ -110,10 +110,10 @@ export default function MainApp() {
           );
         }
 
-        // ✅ Then update state
+        // Then update state
         setShowApp(true);
 
-        // ✅ And only then start following
+        // And only then start following
         await win.setFocus();
         startFollowingOverlay();
       } else {

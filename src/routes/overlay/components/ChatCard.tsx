@@ -273,6 +273,8 @@ export const ChatView = ({
     newMessages,
   ) => {
     // Streaming block
+    console.log("Starting streaming request with tool:", tool);
+    console.log("Request parameters:", { email, message, newConvo, conversationId, provider, modelName, tool });
     setStreamingMsg("");
     const response = await fetch(`${BASE_URL}/generate/msg`, {
       method: "POST",
@@ -291,24 +293,34 @@ export const ChatView = ({
       }),
     });
 
+    console.log("Response status:", response.status);
+    console.log("Response headers:", response.headers);
+    console.log("Starting streaming connection...");
     const reader = response.body?.getReader();
     if (!reader) {
       throw new Error("ReadableStream not supported in this environment.");
     }
+    console.log("Reader obtained, starting to read stream...");
     const decoder = new TextDecoder();
     let fullText = "";
 
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
+      if (done) {
+        console.log("Stream finished");
+        break;
+      }
       const chunk = decoder.decode(value, { stream: true });
+      console.log("Raw chunk received:", chunk);
       chunk.split("\n\n").forEach((event) => {
         if (!event.trim()) return;
         const dataLine = event.replace(/^data:\s*/, "");
         try {
           const data = JSON.parse(dataLine);
           if (data.type === "chunk") {
+            console.log("Frontend received chunk:", data.content);
             fullText += data.content;
+            console.log("fullText length now:", fullText.length);
             setStreamingMsg((prev) => prev + data.content);
           } else if (data.type == "title") {
             if (overlayConvoId === -1) {
@@ -318,21 +330,40 @@ export const ChatView = ({
             // Optionally handle title
           } else if (data.type === "search_site_found") {
             // Handle real-time search progress
+            console.log("Frontend received search_site_found:", data);
+            console.log("Window has addRealSearchSite:", !!(window as any).addRealSearchSite);
             if ((window as any).addRealSearchSite) {
-              (window as any).addRealSearchSite({
+              console.log("Calling addRealSearchSite with:", {
                 site: data.site,
                 domain: data.domain,
                 favicon: data.favicon,
                 title: data.title,
                 link: data.link
               });
+              try {
+                (window as any).addRealSearchSite({
+                  site: data.site,
+                  domain: data.domain,
+                  favicon: data.favicon,
+                  title: data.title,
+                  link: data.link
+                });
+                console.log("addRealSearchSite called successfully");
+              } catch (error) {
+                console.error("Error calling addRealSearchSite:", error);
+              }
+            } else {
+              console.log("addRealSearchSite function not found on window");
             }
           } else if (data.type === "done") {
             // Stream complete
+            console.log("Frontend received 'done' event, fullText length:", fullText.length);
+            console.log("fullText content preview:", fullText.substring(0, 100) + "...");
             setStreamingMsg("");
             setCurrResponse(fullText);
             // Add final message to chat
             // Only append AI message, do not overwrite user message
+            console.log("Adding AI message to chat, current messages count:", newMessages.length);
             setMessages([
               ...newMessages,
               { sender: "ai", text: fullText, image: "" },
@@ -374,7 +405,7 @@ export const ChatView = ({
     // Enhance the user message with context for better AI responses
     const contextAwareMessage = generateContextAwarePrompt(userMsg, insertionContext);
 
-    console.log("🤖 handleAIResponse: Processing message with context:", {
+    console.log("handleAIResponse: Processing message with context:", {
       originalMessage: userMsg,
       contextAwareMessage: contextAwareMessage,
       windowName,
@@ -396,13 +427,25 @@ export const ChatView = ({
     setMessages(newMessages);
     if (overlayConvoId === -1) setTitleLoading(true);
 
-    setIsAIThinking(true);
+    // Set appropriate animation state based on selected tool
+    if (selectedTool === 1) {
+      // Web search animation
+      console.log("Setting web search animation state");
+      setCurrentSearchQuery(userMsg);
+      setIsWebSearching(true);
+      setIsAIThinking(false);
+    } else {
+      // Regular AI thinking animation
+      setIsAIThinking(true);
+      setIsWebSearching(false);
+    }
 
     const imageToSend = manualImage || (isActive ? windowScreenshot : "") || "";
 
     try {
       let ai_res;
       if (imageToSend == "") {
+        console.log("🔧 About to call handleStreamAIResponse with selectedTool:", selectedTool);
         await handleStreamAIResponse(
           email,
           contextAwareMessage, // Use context-aware message
@@ -452,6 +495,7 @@ export const ChatView = ({
     } finally {
       setTitleLoading(false);
       setIsAIThinking(false);
+      setIsWebSearching(false);
       setStreamingMsg("");
     }
   };
@@ -760,7 +804,9 @@ export const ChatView = ({
     setIsInputTyping(false);
 
     if (selectedTool === 1) {
-      handleWebSearch(userMsg, attachedImage || undefined);
+      // Use the streaming web search implementation
+      console.log("Web search tool selected, using streaming implementation");
+      handleAIResponse(userMsg, attachedImage || undefined);
     } else if (selectedTool === 2) {
       handleSupermemory(userMsg, attachedImage || undefined);
     } else if (selectedTool == 4) {
@@ -786,13 +832,13 @@ export const ChatView = ({
 
   const handleInject = async () => {
     try {
-      console.log("🔄 Starting injection...");
+      console.log("Starting injection...");
       console.log("currResponse:", currResponse);
       console.log("windowName:", windowName);
       console.log("windowHwnd:", windowHwnd);
       
       if (!windowHwnd) {
-        console.error("❌ No window HWND available");
+        console.error("No window HWND available");
         return;
       }
       
@@ -806,27 +852,27 @@ export const ChatView = ({
       console.log("insertionContext:", insertionContext);
       
       const insertableText = extractInsertableContent(currResponse, insertionContext);
-      console.log("🔍 Original currResponse:", currResponse);
-      console.log("🔍 Insertion context:", insertionContext);
-      console.log("🎯 Extracted insertableText:", insertableText);
+      console.log("Original currResponse:", currResponse);
+      console.log("Insertion context:", insertionContext);
+      console.log("Extracted insertableText:", insertableText);
       
       if (!insertableText) {
-        console.warn("⚠️ No insertable text extracted, using original response");
+        console.warn("No insertable text extracted, using original response");
         await invoke("inject_text_to_window_by_hwnd", {
           text: currResponse,
           hwnd: windowHwnd,
         });
       } else {
-        console.log("✅ Injecting extracted text");
+        console.log("Injecting extracted text");
         await invoke("inject_text_to_window_by_hwnd", {
           text: insertableText,
           hwnd: windowHwnd,
         });
       }
       
-      console.log("✅ Injection completed");
+      console.log("Injection completed");
     } catch (error) {
-      console.error("❌ Injection failed:", error);
+      console.error("Injection failed:", error);
     }
   };
 
@@ -1257,11 +1303,15 @@ export const ChatView = ({
               )}
 
               {/* Web Search Animation */}
-              <WebSearchAnimation isSearching={isWebSearching} searchQuery={currentSearchQuery} />
+              <WebSearchAnimation
+                isSearching={isWebSearching}
+                searchQuery={currentSearchQuery}
+                isResponseStreaming={streamingMsg.length > 0}
+              />
 
               {/* Image Generation Animation */}
               <AnimatePresence mode="popLayout">
-                {isImageGenerating && (
+                {isImageGenerating && streamingMsg.length === 0 && (
                   <motion.div
                     className="flex gap-2 mt-2 mx-2 dark:text-zinc-200  font-medium items-center text-sm h-fit"
                     initial={{ opacity: 0 }}
@@ -1290,7 +1340,7 @@ export const ChatView = ({
 
               {/* AI Thinking Animation - Simple Pulsing Dot */}
               <AnimatePresence mode="popLayout">
-                {isAIThinking && !isWebSearching && !isImageGenerating && (
+                {isAIThinking && !isWebSearching && !isImageGenerating && streamingMsg.length === 0 && (
                   <motion.div
                     className="flex gap-2 mt-2 mx-2 dark:text-zinc-200  font-medium items-center text-sm h-fit"
                     initial={{ opacity: 0 }}

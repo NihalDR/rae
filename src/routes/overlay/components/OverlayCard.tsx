@@ -183,20 +183,20 @@ const Overlay = () => {
 
   // Save isActive state to localStorage whenever it changes
   useEffect(() => {
-    console.log("🎛️ Toggle state change detected, isActive:", isActive);
+    console.log("Toggle state change detected, isActive:", isActive);
     localStorage.setItem("overlay_active", String(isActive));
-    console.log("💾 Overlay active state saved:", isActive);
+    console.log("Overlay active state saved:", isActive);
 
     // Clear screenshot when toggle is turned off
     if (!isActive) {
-      console.log("🔄 Clearing screenshot - toggle turned off");
+      console.log("Clearing screenshot - toggle turned off");
       console.log(
-        "📸 Before clearing, windowScreenshot length:",
+        "Before clearing, windowScreenshot length:",
         windowScreenshot.length
       );
       setWindowScreenshot("");
       setShowScreenshot(false);
-      console.log("✅ Screenshot cleared - toggle turned off");
+      console.log("Screenshot cleared - toggle turned off");
     } else {
       // Capture screenshot immediately when toggle is turned on
       if (windowHwnd != null) {
