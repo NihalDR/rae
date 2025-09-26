@@ -199,13 +199,14 @@ export default function ChatWindow() {
     };
   };
 
-  const handleSend = async (userMsg: string, manualImage?: string) => {
+  const handleSend = async (userMsg: string, images?: string[]) => {
+    const imagesToSend = images && images.length > 0 ? images : [""];
     let newMessages = [
       ...messages,
       {
         sender: "user" as const,
         text: userMsg,
-        image: [""],
+        image: imagesToSend,
       },
     ];
     setMessages(newMessages);
@@ -213,8 +214,7 @@ export default function ChatWindow() {
     setIsAIThinking(true);
 
     try {
-      let imageToSend = manualImage || "";
-      if (!imageToSend && selectedTool === 0) {
+      if ((!images || images.length === 0) && selectedTool === 0) {
         // Streaming logic for normal chat (no image, no tool)
         await handleStreamAIResponse(
           email,
@@ -235,14 +235,14 @@ export default function ChatWindow() {
           conversationId: currentConvoId,
           provider: currentModel.label,
           modelName: currentModel.value,
-          image: [imageToSend],
+          image: imagesToSend,
         });
         let updatedMessages = [
           ...newMessages,
           {
             sender: "ai" as const,
             text: ai_res.aiResponse,
-            image: ["",]
+            image: [""],
           },
         ];
         setMessages(updatedMessages);
@@ -261,7 +261,7 @@ export default function ChatWindow() {
           conversationId: currentConvoId,
           provider: currentModel.label,
           modelName: currentModel.value,
-          image: [imageToSend],
+          image: imagesToSend,
         });
         let updatedMessages = [
           ...newMessages,
@@ -288,7 +288,7 @@ export default function ChatWindow() {
           conversationId: currentConvoId,
           provider: currentModel.label,
           modelName: currentModel.value,
-          image: [imageToSend],
+          image: imagesToSend,
         });
         let updatedMessages = [
           ...newMessages,
@@ -389,14 +389,15 @@ export default function ChatWindow() {
   // Handler for image generation
   const handleImageGeneration = async (
     userMsg: string,
-    manualImage?: string,
+    images?: string[],
   ) => {
+    const imagesToSend = images && images.length > 0 ? images : [""];
     let newMessages = [
       ...messages,
       {
         sender: "user" as const,
         text: userMsg,
-        image: manualImage ? [manualImage] : [""],
+        image: imagesToSend,
       },
     ];
     setMessages(newMessages);
@@ -411,7 +412,7 @@ export default function ChatWindow() {
         conversationId: currentConvoId,
         provider: currentModel.label,
         modelName: currentModel.value,
-        image:  manualImage ? [manualImage] : [""],
+        image: imagesToSend,
       });
       let updatedMessages = [
         ...newMessages,

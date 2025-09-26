@@ -42,10 +42,10 @@ const defaultModels = [
 
 interface ChatProps {
   name: string;
-  onSend?: (msg: string, image?: string) => void;
-  onWebSearch?: (msg: string, image?: string) => void;
-  onSupermemory?: (msg: string, image?: string) => void;
-  onImageGeneration?: (msg: string, image?: string) => void;
+  onSend?: (msg: string, images?: string[]) => void;
+  onWebSearch?: (msg: string, images?: string[]) => void;
+  onSupermemory?: (msg: string, images?: string[]) => void;
+  onImageGeneration?: (msg: string, images?: string[]) => void;
   currentModel?: { label: string; value: string };
   setCurrentModel?: (model: { label: string; value: string }) => void;
   models?: { label: string; value: string }[];
@@ -80,8 +80,7 @@ const Chat: React.FC<ChatProps> = ({
   const [disabled, setDisabled] = useState(true);
   const [expanded, setExpanded] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
-  const [attachedImage, setAttachedImage] = useState<string | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [attachedImages, setAttachedImages] = useState<string[]>([]);
   const [init, setInit] = useState(initial);
   const [toolsDropdownOpen, setToolsDropdownOpen] = useState(false);
   const toolsDropdownRef = useRef<HTMLDivElement>(null);
@@ -142,11 +141,10 @@ const Chat: React.FC<ChatProps> = ({
   const handleSend = () => {
     if (!message.trim()) return;
     if (!init) setInit(true);
-    if (onSend) onSend(message, attachedImage || undefined);
+  if (onSend) onSend(message, attachedImages.length > 0 ? attachedImages.slice(0, 3) : undefined);
     setMessage("");
     setIsTyping(false);
-    setAttachedImage(null);
-    setImagePreview(null);
+    setAttachedImages([]);
     if (chatInputRef.current) {
       chatInputRef.current.value = "";
       //   autosize.update(chatInputRef.current);
@@ -155,11 +153,10 @@ const Chat: React.FC<ChatProps> = ({
 
   const handleWebSearch = () => {
     if (!message.trim()) return;
-    if (onWebSearch) onWebSearch(message, attachedImage || undefined);
+  if (onWebSearch) onWebSearch(message, attachedImages.length > 0 ? attachedImages.slice(0, 3) : undefined);
     setMessage("");
     setIsTyping(false);
-    setAttachedImage(null);
-    setImagePreview(null);
+    setAttachedImages([]);
     if (chatInputRef.current) {
       chatInputRef.current.value = "";
       autosize.update(chatInputRef.current);
@@ -169,11 +166,10 @@ const Chat: React.FC<ChatProps> = ({
   const handleSupermemory = () => {
     if (!message.trim()) return;
     if (!init) setInit(true);
-    if (onSupermemory) onSupermemory(message, attachedImage || undefined);
+  if (onSupermemory) onSupermemory(message, attachedImages.length > 0 ? attachedImages.slice(0, 3) : undefined);
     setMessage("");
     setIsTyping(false);
-    setAttachedImage(null);
-    setImagePreview(null);
+    setAttachedImages([]);
     if (chatInputRef.current) {
       chatInputRef.current.value = "";
       //   autosize.update(chatInputRef.current);
@@ -184,11 +180,10 @@ const Chat: React.FC<ChatProps> = ({
     if (!message.trim()) return;
     if (!init) setInit(true);
     if (onImageGeneration)
-      onImageGeneration(message, attachedImage || undefined);
+      onImageGeneration(message, attachedImages.length > 0 ? attachedImages.slice(0, 3) : undefined);
     setMessage("");
     setIsTyping(false);
-    setAttachedImage(null);
-    setImagePreview(null);
+    setAttachedImages([]);
     if (chatInputRef.current) {
       chatInputRef.current.value = "";
       //   autosize.update(chatInputRef.current);
@@ -199,8 +194,11 @@ const Chat: React.FC<ChatProps> = ({
   useEffect(() => {
     const handleReferenceImage = (event: CustomEvent) => {
       const { imageBase64 } = event.detail;
-      setAttachedImage(imageBase64);
-      setImagePreview(imageBase64);
+      setAttachedImages((prev) => {
+        if (prev.length >= 3) return prev;
+        if (prev.includes(imageBase64)) return prev;
+        return prev.length < 3 ? [...prev, imageBase64] : prev;
+      });
     };
 
     window.addEventListener(
@@ -216,10 +214,9 @@ const Chat: React.FC<ChatProps> = ({
   }, []);
 
   const getPlaceholderText = () => {
-    if (attachedImage) {
-      return "Describe what you want to know about this image...";
+    if (attachedImages.length > 0) {
+      return "Describe what you want to know about these images...";
     }
-
     switch (selectedTool) {
       case 1:
         return "Web search me...";
@@ -233,14 +230,14 @@ const Chat: React.FC<ChatProps> = ({
   };
 
   const handleReferenceImage = (imageBase64: string) => {
-    setAttachedImage(imageBase64);
-    setImagePreview(imageBase64);
-
-    // If not already on image generation tool, switch to it for better workflow
+    setAttachedImages((prev) => {
+      if (prev.length >= 3) return prev;
+      if (prev.includes(imageBase64)) return prev;
+      return prev.length < 3 ? [...prev, imageBase64] : prev;
+    });
     if (selectedTool !== 4 && onToolChange) {
       onToolChange(4);
     }
-
     if (onReferenceImage) {
       onReferenceImage(imageBase64);
     }
@@ -262,7 +259,6 @@ const Chat: React.FC<ChatProps> = ({
   const handlePaste = (e: React.ClipboardEvent) => {
     const items = e.clipboardData?.items;
     if (!items) return;
-
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       if (item.type.indexOf("image") !== -1) {
@@ -272,20 +268,25 @@ const Chat: React.FC<ChatProps> = ({
           const reader = new FileReader();
           reader.onload = (event) => {
             const base64 = event.target?.result as string;
-            setAttachedImage(base64);
-            setImagePreview(base64);
+            setAttachedImages((prev) => {
+              if (prev.length >= 3) return prev;
+              if (prev.includes(base64)) return prev;
+              return prev.length < 3 ? [...prev, base64] : prev;
+            });
           };
           reader.readAsDataURL(file);
         }
-        break;
       }
     }
   };
 
-  // Clear attached image
-  const clearImage = () => {
-    setAttachedImage(null);
-    setImagePreview(null);
+  // Clear attached image(s)
+  const clearImage = (idx?: number) => {
+    if (typeof idx === "number") {
+      setAttachedImages((prev) => prev.filter((_, i) => i !== idx));
+    } else {
+      setAttachedImages([]);
+    }
   };
 
   const handleInputChange = (value: string) => {
@@ -363,31 +364,33 @@ const Chat: React.FC<ChatProps> = ({
                         ></textarea>
                       </div>
 
-                      {/* Image attachment indicator */}
+                      {/* Image attachment indicators (multiple) */}
                       <AnimatePresence>
-                        {imagePreview && (
+                        {attachedImages.length > 0 && (
                           <motion.div
                             initial={{ opacity: 0, scale: 0.8 }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.8 }}
                             className="absolute top-2 right-2 flex items-center gap-2"
                           >
-                            <div className="relative group">
-                              <img
-                                src={imagePreview}
-                                alt="Attached screenshot"
-                                className="w-8 h-8 object-cover rounded border border-border cursor-pointer"
-                                title="Screenshot attached - Click to remove"
-                                onClick={clearImage}
-                              />
-                              <button
-                                onClick={clearImage}
-                                className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                                title="Remove image"
-                              >
-                                ×
-                              </button>
-                            </div>
+                            {attachedImages.map((img, idx) => (
+                              <div className="relative group" key={idx}>
+                                <img
+                                  src={img}
+                                  alt={`Attached screenshot ${idx + 1}`}
+                                  className="w-8 h-8 object-cover rounded border border-border cursor-pointer"
+                                  title={`Screenshot ${idx + 1} - Click to remove`}
+                                  onClick={() => clearImage(idx)}
+                                />
+                                <button
+                                  onClick={() => clearImage(idx)}
+                                  className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                                  title="Remove image"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
                           </motion.div>
                         )}
                       </AnimatePresence>
@@ -597,8 +600,8 @@ const Chat: React.FC<ChatProps> = ({
                     onPaste={handlePaste}
                     ref={chatInputRef}
                     placeholder={
-                      attachedImage
-                        ? "Describe what you want to know about this image..."
+                      attachedImages.length > 0
+                        ? "Describe what you want to know about these images..."
                         : "Enter your message or paste a screenshot"
                     }
                     name=""
@@ -613,31 +616,33 @@ const Chat: React.FC<ChatProps> = ({
                     value={message}
                   ></textarea>
 
-                  {/* Image attachment indicator */}
+                  {/* Image attachment indicators (multiple) */}
                   <AnimatePresence>
-                    {imagePreview && (
+                    {attachedImages.length > 0 && (
                       <motion.div
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.8 }}
                         className="absolute top-2 right-2 flex items-center gap-2"
                       >
-                        <div className="relative group">
-                          <img
-                            src={imagePreview}
-                            alt="Attached screenshot"
-                            className="w-8 h-8 object-cover rounded border border-border cursor-pointer"
-                            title="Screenshot attached - Click to remove"
-                            onClick={clearImage}
-                          />
-                          <button
-                            onClick={clearImage}
-                            className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                            title="Remove image"
-                          >
-                            ×
-                          </button>
-                        </div>
+                        {attachedImages.map((img, idx) => (
+                          <div className="relative group" key={idx}>
+                            <img
+                              src={img}
+                              alt={`Attached screenshot ${idx + 1}`}
+                              className="w-8 h-8 object-cover rounded border border-border cursor-pointer"
+                              title={`Screenshot ${idx + 1} - Click to remove`}
+                              onClick={() => clearImage(idx)}
+                            />
+                            <button
+                              onClick={() => clearImage(idx)}
+                              className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Remove image"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
                       </motion.div>
                     )}
                   </AnimatePresence>
