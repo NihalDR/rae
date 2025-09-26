@@ -421,7 +421,7 @@ export const ChatView = ({
       {
         sender: "user" as const,
         text: userMsg, // Show original message to user
-        image: finalImage,
+        image: [finalImage],
       },
     ];
     setMessages(newMessages);
@@ -470,7 +470,7 @@ export const ChatView = ({
 
         const updatedMessages = [
           ...newMessages,
-          { sender: "ai" as const, text: ai_res.aiResponse, image: "" },
+          { sender: "ai" as const, text: ai_res.aiResponse, image: [""] },
         ];
 
         setMessages(updatedMessages);
@@ -488,7 +488,7 @@ export const ChatView = ({
         {
           sender: "ai" as const,
           text: "Sorry, I encountered an error.",
-          image: "",
+          image: [""],
         },
       ];
       setMessages(errorMessages);
@@ -617,7 +617,7 @@ export const ChatView = ({
       {
         sender: "user" as const,
         text: userMsg, // Show original message to user
-        image: attachedImage || windowScreenshot || "",
+          image: attachedImage ? [attachedImage] : (windowScreenshot ? [windowScreenshot] : [""])
       },
     ];
     setMessages(newMessages);
@@ -641,7 +641,7 @@ export const ChatView = ({
 
       const updatedMessages = [
         ...newMessages,
-        { sender: "ai" as const, text: ai_res.aiResponse, image: "" },
+        { sender: "ai" as const, text: ai_res.aiResponse, image: [""] },
       ];
 
       setMessages(updatedMessages);
@@ -658,7 +658,7 @@ export const ChatView = ({
         {
           sender: "ai" as const,
           text: "Sorry, I encountered an error with web search.",
-          image: "",
+          image: [""],
         },
       ];
       setMessages(errorMessages);
@@ -685,7 +685,7 @@ export const ChatView = ({
       {
         sender: "user" as const,
         text: userMsg, // Show original message to user
-        image: attachedImage || windowScreenshot || "",
+        image: attachedImage ? [attachedImage] : (windowScreenshot ? [windowScreenshot] : [""]),
       },
     ];
     setMessages(newMessages);
@@ -708,7 +708,7 @@ export const ChatView = ({
 
       const updatedMessages = [
         ...newMessages,
-        { sender: "ai" as const, text: ai_res.aiResponse, image: "" },
+        { sender: "ai" as const, text: ai_res.aiResponse, image: [""] },
       ];
 
       setMessages(updatedMessages);
@@ -725,7 +725,7 @@ export const ChatView = ({
         {
           sender: "ai" as const,
           text: "Sorry, I encountered an error with memory search.",
-          image: "",
+          image: [""],
         },
       ];
       setMessages(errorMessages);
@@ -745,7 +745,7 @@ export const ChatView = ({
       {
         sender: "user" as const,
         text: userMsg,
-        image: attachedImage || windowScreenshot || "",
+        image: attachedImage ? [attachedImage] : (windowScreenshot ? [windowScreenshot] : [""]),
       },
     ];
     setMessages(newMessages);
@@ -787,7 +787,7 @@ export const ChatView = ({
         {
           sender: "ai" as const,
           text: "Sorry, I encountered an error with web search.",
-          image: "",
+          image: [""],
         },
       ];
       setMessages(errorMessages);
@@ -1212,7 +1212,7 @@ export const ChatView = ({
                       )}
 
                   {/* Show image if exists */}
-                  {msg.image && (
+                  {msg.image &&msg.image.length > 0&& (
                     <div
                       className="mt-2 relative inline-block"
                       onMouseEnter={() =>
@@ -1221,7 +1221,7 @@ export const ChatView = ({
                       onMouseLeave={() => setHoveredImageIndex(null)}
                     >
                       <img
-                        src={msg.image}
+                        src={msg.image[0]}
                         alt={
                           msg.sender === "user"
                             ? "User uploaded"
@@ -1238,7 +1238,7 @@ export const ChatView = ({
                       {msg.sender === "ai" && hoveredImageIndex === idx && (
                         <div className="absolute inset-0 bg-black bg-opacity-50 rounded-lg flex items-center justify-center transition-all duration-200 animate-in fade-in-0">
                           <button
-                            onClick={() => handleReferenceImage(msg.image)}
+                            onClick={() => handleReferenceImage(msg.image[0])}
                             className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 text-sm font-medium shadow-lg transform ${
                               selectedTool === 4
                                 ? "bg-blue-500 text-white hover:bg-blue-600 hover:shadow-xl"
