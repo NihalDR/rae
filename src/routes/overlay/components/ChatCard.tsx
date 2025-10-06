@@ -1,14 +1,8 @@
-import {
-  useEffect,
-  useRef,
-  useState,
-  ReactNode,
-} from "react";
+import { useEffect, useRef, useState, ReactNode } from "react";
 import { emit, listen } from "@tauri-apps/api/event";
-import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { LogicalSize } from "@tauri-apps/api/dpi";
+
 import { useUserStore } from "@/store/userStore";
-import { ChatMessage, useChatStore } from "@/store/chatStore";
+import { useChatStore } from "@/store/chatStore";
 import {
   Generate,
   GenerateWithWebSearch,
@@ -17,16 +11,7 @@ import {
   BASE_URL,
 } from "@/api/chat";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  X,
-  Loader2,
-  Minimize2,
-  Maximize2,
-  Globe,
-  Brain,
-  Image,
-  Plus,
-} from "lucide-react";
+import { X, Loader2, Minimize2, Image, Plus } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
@@ -34,25 +19,14 @@ import CodeBlock from "@/components/misc/CodeBlock";
 
 import { animations } from "@/constants/animations";
 import { invoke } from "@tauri-apps/api/core";
-import { useNoteStore } from "@/store/noteStore";
-import { extractInsertableContent, InsertionContext, generateContextAwarePrompt } from "@/utils/textExtraction";
+
+import {
+  extractInsertableContent,
+  InsertionContext,
+  generateContextAwarePrompt,
+} from "@/utils/textExtraction";
 import WebSearchAnimation from "./WebSearchAnimation";
-// Passing OpenAI logo SVG as a data URL
-const openaiLogo = `data:image/svg+xml;base64,${btoa(`<svg width="721" height="721" viewBox="0 0 721 721" fill="none" xmlns="http://www.w3.org/2000/svg">
-<g clip-path="url(#clip0_1637_2934)">
-<g clip-path="url(#clip1_1637_2934)">
-<path d="M304.246 294.611V249.028C304.246 245.189 305.687 242.309 309.044 240.392L400.692 187.612C413.167 180.415 428.042 177.058 443.394 177.058C500.971 177.058 537.44 221.682 537.44 269.182C537.44 272.54 537.44 276.379 536.959 280.218L441.954 224.558C436.197 221.201 430.437 221.201 424.68 224.558L304.246 294.611ZM518.245 472.145V363.224C518.245 356.505 515.364 351.707 509.608 348.349L389.174 278.296L428.519 255.743C431.877 253.826 434.757 253.826 438.115 255.743L529.762 308.523C556.154 323.879 573.905 356.505 573.905 388.171C573.905 424.636 552.315 458.225 518.245 472.141V472.145ZM275.937 376.182L236.592 353.152C233.235 351.235 231.794 348.354 231.794 344.515V238.956C231.794 187.617 271.139 148.749 324.4 148.749C344.555 148.749 363.264 155.468 379.102 167.463L284.578 222.164C278.822 225.521 275.942 230.319 275.942 237.039V376.186L275.937 376.182ZM360.626 425.122L304.246 393.455V326.283L360.626 294.616L417.002 326.283V393.455L360.626 425.122ZM396.852 570.989C376.698 570.989 357.989 564.27 342.151 552.276L436.674 497.574C442.431 494.217 445.311 489.419 445.311 482.699V343.552L485.138 366.582C488.495 368.499 489.936 371.379 489.936 375.219V480.778C489.936 532.117 450.109 570.985 396.852 570.985V570.989ZM283.134 463.99L191.486 411.211C165.094 395.854 147.343 363.229 147.343 331.562C147.343 294.616 169.415 261.509 203.48 247.593V356.991C203.48 363.71 206.361 368.508 212.117 371.866L332.074 441.437L292.729 463.99C289.372 465.907 286.491 465.907 283.134 463.99ZM277.859 542.68C223.639 542.68 183.813 501.895 183.813 451.514C183.813 447.675 184.294 443.836 184.771 439.997L279.295 494.698C285.051 498.056 290.812 498.056 296.568 494.698L417.002 425.127V470.71C417.002 474.549 415.562 477.429 412.204 479.346L320.557 532.126C308.081 539.323 293.206 542.68 277.854 542.68H277.859ZM396.852 599.776C454.911 599.776 503.37 558.513 514.41 503.812C568.149 489.896 602.696 439.515 602.696 388.176C602.696 354.587 588.303 321.962 562.392 298.45C564.791 288.373 566.231 278.296 566.231 268.224C566.231 199.611 510.571 148.267 446.274 148.267C433.322 148.267 420.846 150.184 408.37 154.505C386.775 133.392 357.026 119.958 324.4 119.958C266.342 119.958 217.883 161.22 206.843 215.921C153.104 229.837 118.557 280.218 118.557 331.557C118.557 365.146 132.95 397.771 158.861 421.283C156.462 431.36 155.022 441.437 155.022 451.51C155.022 520.123 210.682 571.466 274.978 571.466C287.931 571.466 300.407 569.549 312.883 565.228C334.473 586.341 364.222 599.776 396.852 599.776Z" fill="black"/>
-</g>
-</g>
-<defs>
-<clipPath id="clip0_1637_2934">
-<rect width="720" height="720" fill="white" transform="translate(0.606934 0.0999756)"/>
-</clipPath>
-<clipPath id="clip1_1637_2934">
-<rect width="484.139" height="479.818" fill="white" transform="translate(118.557 119.958)"/>
-</clipPath>
-</defs>
-</svg>`)}`;
+import { openaiLogo } from "@/constants/logos";
 import { OverlayButton } from "./OverlayComponents";
 import {
   ArrowElbowDownLeftIcon,
@@ -124,50 +98,6 @@ const Option = ({
   );
 };
 
-// Utility function for smooth window resizing with easing
-const performSmoothResize = async (
-  targetWidth: number,
-  targetHeight: number,
-  duration: number = 160,
-) => {
-  const win = getCurrentWebviewWindow();
-  const currentSize = await win.innerSize();
-
-  const startWidth = currentSize.width;
-  const startHeight = currentSize.height;
-  const startTime = performance.now();
-
-  return new Promise<void>((resolve) => {
-    const animate = async (currentTime: number) => {
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-
-      // Easing function for smooth acceleration/deceleration
-      const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
-      const easedProgress = easeOutCubic(progress);
-
-      const currentWidth = Math.round(
-        startWidth + (targetWidth - startWidth) * easedProgress,
-      );
-      const currentHeight = Math.round(
-        startHeight + (targetHeight - startHeight) * easedProgress,
-      );
-
-      await win.setSize(new LogicalSize(currentWidth, currentHeight));
-
-      if (progress < 1) {
-        requestAnimationFrame(animate);
-      } else {
-        // Ensure final size is exact
-        await win.setSize(new LogicalSize(targetWidth, targetHeight));
-        resolve();
-      }
-    };
-
-    requestAnimationFrame(animate);
-  });
-};
-
 export const ChatView = ({
   onClose,
   initialMessage,
@@ -197,8 +127,6 @@ export const ChatView = ({
     setOverlayConvoId,
   } = useChatStore();
 
-  const { notes } = useNoteStore();
-
   // Chat-specific state
 
   const [chatInputText, setChatInputText] = useState("");
@@ -224,7 +152,15 @@ export const ChatView = ({
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
 
   // File attachments support
-  const [attachedFiles, setAttachedFiles] = useState<{name: string, type: string, size: number, content: string, textContent?: string}[]>([]);
+  const [attachedFiles, setAttachedFiles] = useState<
+    {
+      name: string;
+      type: string;
+      size: number;
+      content: string;
+      textContent?: string;
+    }[]
+  >([]);
 
   // Helper to get the images to preview/send, always including windowScreenshot if isActive (analysis mode)
   const getImagesToSend = () => {
@@ -239,7 +175,6 @@ export const ChatView = ({
     return imgs.slice(0, 3);
   };
   const [stealthMode, setStealthMode] = useState<boolean>(false);
-  const [lastImage, setLastImage] = useState<string>("");
   const [hoveredImageIndex, setHoveredImageIndex] = useState<number | null>(
     null,
   );
@@ -347,14 +282,17 @@ export const ChatView = ({
           } else if (data.type === "search_site_found") {
             // Handle real-time search progress
             console.log("Frontend received search_site_found:", data);
-            console.log("Window has addRealSearchSite:", !!(window as any).addRealSearchSite);
+            console.log(
+              "Window has addRealSearchSite:",
+              !!(window as any).addRealSearchSite,
+            );
             if ((window as any).addRealSearchSite) {
               console.log("Calling addRealSearchSite with:", {
                 site: data.site,
                 domain: data.domain,
                 favicon: data.favicon,
                 title: data.title,
-                link: data.link
+                link: data.link,
               });
               try {
                 (window as any).addRealSearchSite({
@@ -362,7 +300,7 @@ export const ChatView = ({
                   domain: data.domain,
                   favicon: data.favicon,
                   title: data.title,
-                  link: data.link
+                  link: data.link,
                 });
                 console.log("addRealSearchSite called successfully");
               } catch (error) {
@@ -373,13 +311,22 @@ export const ChatView = ({
             }
           } else if (data.type === "done") {
             // Stream complete
-            console.log("Frontend received 'done' event, fullText length:", fullText.length);
-            console.log("fullText content preview:", fullText.substring(0, 100) + "...");
+            console.log(
+              "Frontend received 'done' event, fullText length:",
+              fullText.length,
+            );
+            console.log(
+              "fullText content preview:",
+              fullText.substring(0, 100) + "...",
+            );
             setStreamingMsg("");
             setCurrResponse(fullText);
             // Add final message to chat
             // Only append AI message, do not overwrite user message
-            console.log("Adding AI message to chat, current messages count:", newMessages.length);
+            console.log(
+              "Adding AI message to chat, current messages count:",
+              newMessages.length,
+            );
             setMessages([
               ...newMessages,
               { sender: "ai", text: fullText, image: "" },
@@ -409,7 +356,7 @@ export const ChatView = ({
 
   const handleAIResponse = async (userMsg: string, manualImage?: string) => {
     if (userMsg.trim() === "") return;
-  const imagesToSend = manualImage ? [manualImage] : getImagesToSend();
+    const imagesToSend = manualImage ? [manualImage] : getImagesToSend();
 
     // Note: File content will be processed by the backend
     let enhancedMessage = userMsg;
@@ -419,7 +366,10 @@ export const ChatView = ({
       windowScreenshot: windowScreenshot || undefined,
     };
     // Enhance the user message with context for better AI responses
-    const contextAwareMessage = generateContextAwarePrompt(enhancedMessage, insertionContext);
+    const contextAwareMessage = generateContextAwarePrompt(
+      enhancedMessage,
+      insertionContext,
+    );
     console.log("handleAIResponse: Processing message with context:", {
       originalMessage: userMsg,
       enhancedMessage,
@@ -458,7 +408,10 @@ export const ChatView = ({
     try {
       let ai_res;
       if (imagesToSend.length === 0) {
-        console.log("🔧 About to call handleStreamAIResponse with selectedTool:", selectedTool);
+        console.log(
+          "🔧 About to call handleStreamAIResponse with selectedTool:",
+          selectedTool,
+        );
         await handleStreamAIResponse(
           email,
           contextAwareMessage, // Use context-aware message
@@ -537,15 +490,15 @@ export const ChatView = ({
   // Removed typing animation effect
 
   const handleNewChat = () => {
-  setMessages([]);
-  setOverlayChatTitle("New Chat");
-  setOverlayConvoId(-1);
-  setChatInputText("");
-  setCurrResponse("");
-  setIsInputTyping(false);
-  setSelectedTool(0);
-  setAttachedImages([]);
-  setAttachedFiles([]);
+    setMessages([]);
+    setOverlayChatTitle("New Chat");
+    setOverlayConvoId(-1);
+    setChatInputText("");
+    setCurrResponse("");
+    setIsInputTyping(false);
+    setSelectedTool(0);
+    setAttachedImages([]);
+    setAttachedFiles([]);
   };
 
   // Handle image paste
@@ -580,10 +533,10 @@ export const ChatView = ({
 
   // Handle file selection
   const handleFileSelect = async () => {
-    const input = document.createElement('input');
-    input.type = 'file';
+    const input = document.createElement("input");
+    input.type = "file";
     input.multiple = true;
-    input.accept = '*/*'; // Allow all file types
+    input.accept = "*/*"; // Allow all file types
 
     input.onchange = (e) => {
       const files = (e.target as HTMLInputElement).files;
@@ -598,12 +551,18 @@ export const ChatView = ({
           const reader = new FileReader();
 
           // For text files, also store the text content
-          if (file.type.startsWith('text/') || file.name.toLowerCase().endsWith('.txt') ||
-              file.name.toLowerCase().endsWith('.js') || file.name.toLowerCase().endsWith('.ts') ||
-              file.name.toLowerCase().endsWith('.py') || file.name.toLowerCase().endsWith('.json') ||
-              file.name.toLowerCase().endsWith('.md') || file.name.toLowerCase().endsWith('.html') ||
-              file.name.toLowerCase().endsWith('.css') || file.name.toLowerCase().endsWith('.xml')) {
-
+          if (
+            file.type.startsWith("text/") ||
+            file.name.toLowerCase().endsWith(".txt") ||
+            file.name.toLowerCase().endsWith(".js") ||
+            file.name.toLowerCase().endsWith(".ts") ||
+            file.name.toLowerCase().endsWith(".py") ||
+            file.name.toLowerCase().endsWith(".json") ||
+            file.name.toLowerCase().endsWith(".md") ||
+            file.name.toLowerCase().endsWith(".html") ||
+            file.name.toLowerCase().endsWith(".css") ||
+            file.name.toLowerCase().endsWith(".xml")
+          ) {
             const textReader = new FileReader();
             textReader.onload = (textEvent) => {
               const textContent = textEvent.target?.result as string;
@@ -612,13 +571,16 @@ export const ChatView = ({
                 const base64 = base64Event.target?.result as string;
                 setAttachedFiles((prev) => {
                   if (prev.length >= 5) return prev; // Limit to 5 files
-                  return [...prev, {
-                    name: file.name,
-                    type: file.type,
-                    size: file.size,
-                    content: base64,
-                    textContent: textContent
-                  }];
+                  return [
+                    ...prev,
+                    {
+                      name: file.name,
+                      type: file.type,
+                      size: file.size,
+                      content: base64,
+                      textContent: textContent,
+                    },
+                  ];
                 });
               };
               base64Reader.readAsDataURL(file);
@@ -629,12 +591,15 @@ export const ChatView = ({
               const base64 = event.target?.result as string;
               setAttachedFiles((prev) => {
                 if (prev.length >= 5) return prev; // Limit to 5 files
-                return [...prev, {
-                  name: file.name,
-                  type: file.type,
-                  size: file.size,
-                  content: base64
-                }];
+                return [
+                  ...prev,
+                  {
+                    name: file.name,
+                    type: file.type,
+                    size: file.size,
+                    content: base64,
+                  },
+                ];
               });
             };
             reader.readAsDataURL(file);
@@ -700,8 +665,11 @@ export const ChatView = ({
       windowName,
       windowScreenshot: windowScreenshot || undefined,
     };
-    const contextAwareMessage = generateContextAwarePrompt(enhancedMessage, insertionContext);
-  const imagesToSend = manualImage ? [manualImage] : getImagesToSend();
+    const contextAwareMessage = generateContextAwarePrompt(
+      enhancedMessage,
+      insertionContext,
+    );
+    const imagesToSend = manualImage ? [manualImage] : getImagesToSend();
     const newMessages = [
       ...messages,
       {
@@ -764,8 +732,11 @@ export const ChatView = ({
       windowName,
       windowScreenshot: windowScreenshot || undefined,
     };
-    const contextAwareMessage = generateContextAwarePrompt(enhancedMessage, insertionContext);
-  const imagesToSend = manualImage ? [manualImage] : getImagesToSend();
+    const contextAwareMessage = generateContextAwarePrompt(
+      enhancedMessage,
+      insertionContext,
+    );
+    const imagesToSend = manualImage ? [manualImage] : getImagesToSend();
     const newMessages = [
       ...messages,
       {
@@ -820,7 +791,7 @@ export const ChatView = ({
     manualImage?: string,
   ) => {
     if (!userMsg.trim()) return;
-  const imagesToSend = manualImage ? [manualImage] : getImagesToSend();
+    const imagesToSend = manualImage ? [manualImage] : getImagesToSend();
 
     // Note: File content will be processed by the backend
     let enhancedMessage = userMsg;
@@ -907,33 +878,35 @@ export const ChatView = ({
   const getCurrentTime = () =>
     new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
-
   const handleInject = async () => {
     try {
       console.log("Starting injection...");
       console.log("currResponse:", currResponse);
       console.log("windowName:", windowName);
       console.log("windowHwnd:", windowHwnd);
-      
+
       if (!windowHwnd) {
         console.error("No window HWND available");
         return;
       }
-      
+
       // Create context for smart insertion
       const insertionContext: InsertionContext = {
         windowName,
         windowScreenshot: windowScreenshot || undefined,
         // Will be auto-detected from windowName
       };
-      
+
       console.log("insertionContext:", insertionContext);
-      
-      const insertableText = extractInsertableContent(currResponse, insertionContext);
+
+      const insertableText = extractInsertableContent(
+        currResponse,
+        insertionContext,
+      );
       console.log("Original currResponse:", currResponse);
       console.log("Insertion context:", insertionContext);
       console.log("Extracted insertableText:", insertableText);
-      
+
       if (!insertableText) {
         console.warn("No insertable text extracted, using original response");
         await invoke("inject_text_to_window_by_hwnd", {
@@ -947,7 +920,7 @@ export const ChatView = ({
           hwnd: windowHwnd,
         });
       }
-      
+
       console.log("Injection completed");
     } catch (error) {
       console.error("Injection failed:", error);
@@ -1015,9 +988,9 @@ export const ChatView = ({
       onClick={() => {
         setOptionsOpen(false);
       }}
-      initial={{  opacity: 1, y:"-100%" }}
-      animate={{  opacity: 1, y:"0%" }}
-      exit={{  opacity: 0, y:"-100%" }}
+      initial={{ opacity: 1, y: "-100%" }}
+      animate={{ opacity: 1, y: "0%" }}
+      exit={{ opacity: 0, y: "-100%" }}
       transition={{ duration: animations.overlayChat, ease: "circInOut" }}
       ref={chatContainerRef}
       className={`no-drag flex flex-col h-screen w-full overflow-hidden relative z-[1000] rounded-xl shadow-lg mt-2 ${
@@ -1080,7 +1053,7 @@ export const ChatView = ({
                     )}
                   </div>
                 </div>
-                
+
                 {/* Insert button */}
                 <div className="flex items-center gap-2 ml-2">
                   <AnimatePresence>
@@ -1117,18 +1090,17 @@ export const ChatView = ({
                     )}
                   </AnimatePresence>
                 </div>
-                
+
                 {/* Time and controls section */}
                 <div className="flex items-center gap-2 ml-auto">
                   <div className="text-zinc-600 text-sm font-medium shrink-0">
                     {getCurrentTime().toUpperCase()}
                   </div>
-                    <OverlayButton onClick={handleNewChat} title="New Chat">
-                      <TrashIcon weight="bold" />
-                    </OverlayButton>
-
-                  </div>
+                  <OverlayButton onClick={handleNewChat} title="New Chat">
+                    <TrashIcon weight="bold" />
+                  </OverlayButton>
                 </div>
+              </div>
             </div>
 
             {/* Image referenced notification */}
@@ -1265,7 +1237,10 @@ export const ChatView = ({
                                             inline={inline}
                                             {...props}
                                           >
-                                            {String(children).replace(/\n$/, "")}
+                                            {String(children).replace(
+                                              /\n$/,
+                                              "",
+                                            )}
                                           </CodeBlock>
                                         );
                                       },
@@ -1286,84 +1261,102 @@ export const ChatView = ({
                           </div>
                         </div>
                       ) : (
-                        <div className="text-[15px] leading-6 font-medium">{msg.text}</div>
+                        <div className="text-[15px] leading-6 font-medium">
+                          {msg.text}
+                        </div>
                       )}
 
-                  {/* Show image if exists */}
-                  {msg.image && msg.image.filter((img: string) => img.trim() !== "").length > 0 && (
-  <div className="mt-2 flex flex-col gap-2">
-    {msg.image
-      .filter((img: string) => img.trim() !== "")
-      .map((img: string, imgIdx: number) => (
-        <div
-          key={imgIdx}
-          className="relative inline-block"
-          onMouseEnter={() =>
-            msg.sender === "ai" ? setHoveredImageIndex(idx) : null
-          }
-          onMouseLeave={() => setHoveredImageIndex(null)}
-        >
-          <img
-            src={img}
-            alt={msg.sender === "user" ? "User uploaded" : "AI generated"}
-            className={`max-w-full rounded-lg border border-gray-300 transition-all duration-200 ${
-              msg.sender === "ai"
-                ? "cursor-pointer hover:scale-[1.02] hover:shadow-lg"
-                : ""
-            }`}
-          />
+                      {/* Show image if exists */}
+                      {msg.image &&
+                        msg.image.filter((img: string) => img.trim() !== "")
+                          .length > 0 && (
+                          <div className="mt-2 flex flex-col gap-2">
+                            {msg.image
+                              .filter((img: string) => img.trim() !== "")
+                              .map((img: string, imgIdx: number) => (
+                                <div
+                                  key={imgIdx}
+                                  className="relative inline-block"
+                                  onMouseEnter={() =>
+                                    msg.sender === "ai"
+                                      ? setHoveredImageIndex(idx)
+                                      : null
+                                  }
+                                  onMouseLeave={() =>
+                                    setHoveredImageIndex(null)
+                                  }
+                                >
+                                  <img
+                                    src={img}
+                                    alt={
+                                      msg.sender === "user"
+                                        ? "User uploaded"
+                                        : "AI generated"
+                                    }
+                                    className={`max-w-full rounded-lg border border-gray-300 transition-all duration-200 ${
+                                      msg.sender === "ai"
+                                        ? "cursor-pointer hover:scale-[1.02] hover:shadow-lg"
+                                        : ""
+                                    }`}
+                                  />
 
-          {/* Hover overlay only for AI images */}
-          {msg.sender === "ai" && hoveredImageIndex === idx && (
-            <div className="absolute inset-0 bg-black bg-opacity-50 rounded-lg flex items-center justify-center transition-all duration-200 animate-in fade-in-0">
-              <button
-                onClick={() => handleReferenceImage(img)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 text-sm font-medium shadow-lg transform ${
-                  selectedTool === 4
-                    ? "bg-blue-500 text-white hover:bg-blue-600 hover:shadow-xl"
-                    : "bg-white text-black hover:bg-gray-100 hover:shadow-xl"
-                }`}
-                title={
-                  selectedTool === 4
-                    ? "Use this image for further modifications"
-                    : "Reference this image in your next message"
-                }
-              >
-                <Image size={16} />
-                {selectedTool === 4 ? "Modify" : "Reference"}
-              </button>
-            </div>
-          )}
-        </div>
-      ))}
-  </div>
-)}
-
-                  {/* Show attached files if exist */}
-                  {msg.files && msg.files.length > 0 && (
-                    <div className="mt-2 flex flex-col gap-2">
-                      <div className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">
-                        Attached files:
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {msg.files.map((file: any, fileIdx: number) => (
-                          <div
-                            key={fileIdx}
-                            className="flex items-center gap-2 px-3 py-2 bg-zinc-100 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700"
-                          >
-                            <div className="flex flex-col">
-                              <div className="text-sm font-medium truncate max-w-[150px]">
-                                {file.name}
-                              </div>
-                              <div className="text-xs text-zinc-500">
-                                {(file.size / 1024).toFixed(1)}KB • {file.type}
-                              </div>
-                            </div>
+                                  {/* Hover overlay only for AI images */}
+                                  {msg.sender === "ai" &&
+                                    hoveredImageIndex === idx && (
+                                      <div className="absolute inset-0 bg-black bg-opacity-50 rounded-lg flex items-center justify-center transition-all duration-200 animate-in fade-in-0">
+                                        <button
+                                          onClick={() =>
+                                            handleReferenceImage(img)
+                                          }
+                                          className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 text-sm font-medium shadow-lg transform ${
+                                            selectedTool === 4
+                                              ? "bg-blue-500 text-white hover:bg-blue-600 hover:shadow-xl"
+                                              : "bg-white text-black hover:bg-gray-100 hover:shadow-xl"
+                                          }`}
+                                          title={
+                                            selectedTool === 4
+                                              ? "Use this image for further modifications"
+                                              : "Reference this image in your next message"
+                                          }
+                                        >
+                                          <Image size={16} />
+                                          {selectedTool === 4
+                                            ? "Modify"
+                                            : "Reference"}
+                                        </button>
+                                      </div>
+                                    )}
+                                </div>
+                              ))}
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                        )}
+
+                      {/* Show attached files if exist */}
+                      {msg.files && msg.files.length > 0 && (
+                        <div className="mt-2 flex flex-col gap-2">
+                          <div className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">
+                            Attached files:
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {msg.files.map((file: any, fileIdx: number) => (
+                              <div
+                                key={fileIdx}
+                                className="flex items-center gap-2 px-3 py-2 bg-zinc-100 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700"
+                              >
+                                <div className="flex flex-col">
+                                  <div className="text-sm font-medium truncate max-w-[150px]">
+                                    {file.name}
+                                  </div>
+                                  <div className="text-xs text-zinc-500">
+                                    {(file.size / 1024).toFixed(1)}KB •{" "}
+                                    {file.type}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1384,7 +1377,11 @@ export const ChatView = ({
                                   {children}
                                 </p>
                               ),
-                              code: ({ className, children, ...props }: any) => {
+                              code: ({
+                                className,
+                                children,
+                                ...props
+                              }: any) => {
                                 const inline = props.inline;
                                 return (
                                   <CodeBlock
@@ -1447,31 +1444,34 @@ export const ChatView = ({
 
               {/* AI Thinking Animation - Simple Pulsing Dot */}
               <AnimatePresence mode="popLayout">
-                {isAIThinking && !isWebSearching && !isImageGenerating && streamingMsg.length === 0 && (
-                  <motion.div
-                    className="flex gap-2 mt-2 mx-2 dark:text-zinc-200  font-medium items-center text-sm h-fit"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.2 }}
-                  >
+                {isAIThinking &&
+                  !isWebSearching &&
+                  !isImageGenerating &&
+                  streamingMsg.length === 0 && (
                     <motion.div
-                      initial={{ borderRadius: "0%", rotate: "90deg" }}
-                      animate={{
-                        borderRadius: ["0%", "50%", "0%"],
-                        rotate: ["90deg", "180deg", "270deg"],
-                      }}
-                      transition={{
-                        duration: 1,
-                        ease: "linear",
-                        repeat: Infinity,
-                        repeatType: "loop",
-                      }}
-                      className="self-start flex items-center relative border-[3px] border-surface size-[20px] justify-center"
-                    ></motion.div>
+                      className="flex gap-2 mt-2 mx-2 dark:text-zinc-200  font-medium items-center text-sm h-fit"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <motion.div
+                        initial={{ borderRadius: "0%", rotate: "90deg" }}
+                        animate={{
+                          borderRadius: ["0%", "50%", "0%"],
+                          rotate: ["90deg", "180deg", "270deg"],
+                        }}
+                        transition={{
+                          duration: 1,
+                          ease: "linear",
+                          repeat: Infinity,
+                          repeatType: "loop",
+                        }}
+                        className="self-start flex items-center relative border-[3px] border-surface size-[20px] justify-center"
+                      ></motion.div>
 
-                    <div className="animate-pulse">Rae is thinking...</div>
-                  </motion.div>
-                )}
+                      <div className="animate-pulse">Rae is thinking...</div>
+                    </motion.div>
+                  )}
               </AnimatePresence>
 
               <div ref={bottomRef} />
@@ -1497,7 +1497,12 @@ export const ChatView = ({
                             key={idx}
                             onClick={() => {
                               // Only allow removing user-attached images, not windowScreenshot if analysis is on
-                              if (isActive && windowScreenshot && img === windowScreenshot) return;
+                              if (
+                                isActive &&
+                                windowScreenshot &&
+                                img === windowScreenshot
+                              )
+                                return;
                               clearImage(idx);
                             }}
                             className="relative group h-[90px] w-[120px] border-2 border-border hover:border-surface/40 group transition-colors cursor-pointer overflow-hidden rounded-sm flex items-center justify-center"
@@ -1506,16 +1511,22 @@ export const ChatView = ({
                               src={img}
                               alt={`Attached screenshot ${idx + 1}`}
                               className="size-full object-cover absolute left-0 top-0  z-10 cursor-pointer"
-                              title={`Screenshot ${idx + 1} attached${isActive && windowScreenshot && img === windowScreenshot ? ' (analysis)' : ''}${isActive && windowScreenshot && img === windowScreenshot ? ' (cannot remove)' : ' - Click to remove'}`}
+                              title={`Screenshot ${idx + 1} attached${isActive && windowScreenshot && img === windowScreenshot ? " (analysis)" : ""}${isActive && windowScreenshot && img === windowScreenshot ? " (cannot remove)" : " - Click to remove"}`}
                               onClick={() => {
-                                if (isActive && windowScreenshot && img === windowScreenshot) return;
+                                if (
+                                  isActive &&
+                                  windowScreenshot &&
+                                  img === windowScreenshot
+                                )
+                                  return;
                                 clearImage(idx);
                               }}
                             />
-                            <TrashSimpleIcon weight="bold" className={`z-40 text-white group-hover:opacity-100 opacity-0 transition-all${isActive && windowScreenshot && img === windowScreenshot ? ' hidden' : ''}`} />
-                            <div
-                              className="absolute group-hover:opacity-100 opacity-0 transition-all z-30 blur-xl -bottom-1/2 left-1/2 -translate-x-1/2  rounded-full pointer-events-auto bg-surface/70 size-[90px] flex items-center justify-center"
-                            ></div>
+                            <TrashSimpleIcon
+                              weight="bold"
+                              className={`z-40 text-white group-hover:opacity-100 opacity-0 transition-all${isActive && windowScreenshot && img === windowScreenshot ? " hidden" : ""}`}
+                            />
+                            <div className="absolute group-hover:opacity-100 opacity-0 transition-all z-30 blur-xl -bottom-1/2 left-1/2 -translate-x-1/2  rounded-full pointer-events-auto bg-surface/70 size-[90px] flex items-center justify-center"></div>
                           </div>
                         ))}
                       </motion.div>
@@ -1546,10 +1557,11 @@ export const ChatView = ({
                                 {(file.size / 1024).toFixed(1)}KB
                               </div>
                             </div>
-                            <TrashSimpleIcon weight="bold" className="z-40 text-white group-hover:opacity-100 opacity-0 transition-all absolute top-1 right-1" />
-                            <div
-                              className="absolute group-hover:opacity-100 opacity-0 transition-all z-30 blur-xl -bottom-1/2 left-1/2 -translate-x-1/2 rounded-full pointer-events-auto bg-surface/70 size-[60px] flex items-center justify-center"
-                            ></div>
+                            <TrashSimpleIcon
+                              weight="bold"
+                              className="z-40 text-white group-hover:opacity-100 opacity-0 transition-all absolute top-1 right-1"
+                            />
+                            <div className="absolute group-hover:opacity-100 opacity-0 transition-all z-30 blur-xl -bottom-1/2 left-1/2 -translate-x-1/2 rounded-full pointer-events-auto bg-surface/70 size-[60px] flex items-center justify-center"></div>
                           </div>
                         ))}
                       </motion.div>
@@ -1709,7 +1721,6 @@ export const ChatView = ({
                   </OverlayButton>
                 </div>
                 <div className="w-full h-full py-1 relative">
-                  
                   <div className="relative  size-full dark:bg-zinc-950 focus-within:dark:bg-zinc-950 rounded-lg transition-all duration-100 border-2 dark:border-zinc-950 focus-within:dark:border-zinc-900">
                     {/* Tool indicator */}
                     <AnimatePresence>
@@ -1748,7 +1759,6 @@ export const ChatView = ({
                     />
 
                     {/* Image attachment indicator */}
-                    
                   </div>
                 </div>
                 <div className="h-full w-fit  flex items-center p-1 ">
