@@ -38,6 +38,7 @@ import Agent from "./routes/app/agents/agent/page";
 import Memory from "./routes/settings/memory/page";
 import { LaunchOverlayWindow } from "./routes/overlay/components/OverlayLauncher";
 import { useUserStore } from "./store/userStore";
+import { Provider } from "jotai";
 
 function App() {
   const { darkTheme, initializeTheme } = useDarkThemeStore();
@@ -345,7 +346,8 @@ useEffect(() => {
   }, [loggedIn]);
   return (
     // <div className="size-full bg-background rounded-lg overflow-hidden">
-    <Routes>
+    <Provider>
+      <Routes>
       <Route path="/" element={<Onboarding />} />
       <Route path="/overlay" element={<Overlay />} />
       <Route path="/app" element={<MainApp />}>
@@ -363,6 +365,7 @@ useEffect(() => {
         </Route>
       </Route>
     </Routes>
+    </Provider>
     // </div>
   );
 }

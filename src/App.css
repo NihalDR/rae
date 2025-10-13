@@ -70,7 +70,7 @@
       --color-card: #151515;
       --color-foreground: #ffffff;
       --color-border: #222222;
-      --color-background: rgba(0,0,0, 0.9);
+      --color-background: #010101;
       --color-surface: #ff2b44;
     }
   }
@@ -112,6 +112,20 @@ h1 {
 @media (prefers-color-scheme: dark) {
 }
 
-*{
+/* Allow text selection by default */
+* {
+  user-select: text;
+}
+
+/* Disable text selection for interactive elements */
+button,
+input,
+textarea,
+select,
+option,
+.drag,
+.no-drag,
+[role="button"],
+[data-radix-collection-item] {
   user-select: none;
 }

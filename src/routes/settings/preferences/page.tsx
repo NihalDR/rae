@@ -69,6 +69,9 @@ const Preferences = () => {
   const [autoStartEnabled, setAutoStartEnabled] = useState<boolean>(
     localStorage.getItem("auto_start_enabled") === "true",
   );
+  const [bubbleSoundEnabled, setBubbleSoundEnabled] = useState<boolean>(
+    localStorage.getItem("bubble_sound_enabled") !== "false", // Default to true
+  );
 
   useEffect(() => {
     invoke<boolean>("get_auto_show_on_copy_enabled")
@@ -133,9 +136,6 @@ const Preferences = () => {
     initializeTheme();
   }, [initializeTheme]);
 
-  const [gradient, setGradient] = useState<boolean>(
-    localStorage.getItem("gradient") === "true",
-  );
 
   return (
     <div className="w-full h-full bg-background text-foreground  overflow-y-auto">
@@ -241,26 +241,6 @@ const Preferences = () => {
         <Card>
           <SectionHeader title="Appearance" />
           <div className="divide-y divide-border">
-            {/* <ToggleRow
-              label="Dark theme"
-              enabled={darkTheme}
-              onToggle={async (next) => {
-                setDarkTheme(next);
-              }}
-            /> */}
-            <ToggleRow
-              label="Gradient in notch"
-              enabled={gradient}
-              onToggle={async (next) => {
-                console.log("Toggling gradient to:", next);
-                localStorage.setItem("gradient", String(next));
-                console.log("Emitting gradient_changed event with:", {
-                  gradient: next,
-                });
-                emit("gradient_changed", { gradient: next });
-                setGradient(next);
-              }}
-            />
             <ToggleRow
               label="Show window info in notch"
               enabled={notchWindowDisplay}
@@ -274,13 +254,20 @@ const Preferences = () => {
                 } catch (_) {}
               }}
             />
-            {/* <ToggleRow
-              label="Gradient in notch"
-              enabled={darkTheme}
+          </div>
+        </Card>
+        <Card>
+          <SectionHeader title="Sound" />
+          <div className="divide-y divide-border">
+            <ToggleRow
+              label="Enable/Disable notch sound"
+              enabled={bubbleSoundEnabled}
               onToggle={async (next) => {
-                setDarkTheme(next);
+                setBubbleSoundEnabled(next);
+                localStorage.setItem("bubble_sound_enabled", String(next));
+                emit("bubble_sound_enabled_changed", { enabled: next });
               }}
-            /> */}
+            />
           </div>
         </Card>
       </div>

@@ -1,4 +1,4 @@
 export const animations = {
-    overlayChat: 0.2,
+    overlayChat: 0.4,
     overlayExpand: 0.4,
 }

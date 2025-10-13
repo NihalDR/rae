@@ -1,16 +1,13 @@
 use crate::utils::{smooth_move, smooth_resize, get_monitor_by_window_position};
 use enigo::{Enigo, MouseControllable};
-use window_vibrancy::{apply_acrylic, clear_acrylic, clear_blur};
+use window_vibrancy::clear_acrylic;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 use tauri::{
     utils::config::WindowEffectsConfig,
-    window::{Effect, EffectsBuilder},
+    window::Effect,
     AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder,
 };
-
-// Import stealth functions
-use super::stealth::apply_stealth_mode_to_window;
 
 // Controls whether toggle_magic_dot is allowed to create the window
 static ALLOW_MAGIC_DOT_CREATE: AtomicBool = AtomicBool::new(true);
@@ -40,7 +37,6 @@ pub fn follow_magic_dot(app: AppHandle) {
 #[tauri::command]
 pub fn pin_magic_dot(app: AppHandle) {
     if let Some(window) = app.get_webview_window("overlay") {
-        println!("Pinning magic dot");
         // clear_blur(&window);
         // clear_acrylic(&window);
 
@@ -157,19 +153,15 @@ pub fn center_magic_dot(app: AppHandle) {
 #[tauri::command]
 pub fn center_overlay_bar(app: AppHandle) {
     if let Some(window) = app.get_webview_window("overlay") {
-        println!("center_overlay_bar: Starting centering process");
-
         // Emit events to unpin and disable notch mode first
         let _ = window.emit("disable_pin_on_show", ());
         let _ = window.emit("disable_notch_on_show", ());
         let _ = window.emit("center_overlay_bar", ());
-        println!("center_overlay_bar: Emitted disable events and center notification");
 
         // Show the window if it's hidden
         let _ = window.show();
         let _ = window.set_focus();
         let _ = window.set_always_on_top(true);
-        println!("center_overlay_bar: Window shown and focused");
 
         // Make sure it's not in notch mode by enabling mouse events
         let _ = window.set_ignore_cursor_events(false);
@@ -184,12 +176,10 @@ pub fn center_overlay_bar(app: AppHandle) {
         ) {
             if let Some(monitor) = get_monitor_by_window_position(&window, &app) {
                 let monitor_pos = monitor.position();
-                println!("center_overlay_bar: Current size: {}x{}", size.width, size.height);
                 let screen = monitor.size();
                 let x = monitor_pos.x + ((screen.width as i32 - size.width as i32) / 2).max(0);
                 let y = monitor_pos.y + ((screen.height as i32 - size.height as i32) / 2).max(0);
 
-                println!("center_overlay_bar: Centering to position: ({}, {})", x, y);
                 let target_pos = tauri::PhysicalPosition { x, y };
                 smooth_move(
                     &window,
@@ -198,29 +188,18 @@ pub fn center_overlay_bar(app: AppHandle) {
                     16,  // More steps for smoother animation
                     8,   // Shorter delay for fluid motion
                 );
-            } else {
-                println!("center_overlay_bar: Failed to get monitor for window position");
             }
-        } else {
-            println!("center_overlay_bar: Failed to get size/position");
         }
 
         // Don't start notch watcher when centering - we want bar mode, not notch mode
-        println!("center_overlay_bar: Completed centering process (bar mode)");
-    } else {
-        println!("center_overlay_bar: Could not find overlay window");
     }
 }
 
 #[tauri::command]
 pub fn toggle_pin_overlay(app: AppHandle) {
     if let Some(window) = app.get_webview_window("overlay") {
-        println!("toggle_pin_overlay: Toggling pin state");
         // Emit event to frontend to toggle pin state
         let _ = window.emit("toggle_pin_state", ());
-        println!("toggle_pin_overlay: Emitted toggle_pin_state event");
-    } else {
-        println!("toggle_pin_overlay: Could not find overlay window");
     }
 }
 
@@ -248,7 +227,6 @@ pub fn toggle_magic_dot(app: AppHandle) {
                     unsafe {
                         LAST_OVERLAY_POSITION = Some(current_pos);
                     }
-                    println!("toggle_magic_dot: Saved position ({}, {}) before hiding", current_pos.x, current_pos.y);
                 }
                 let _ = dot.hide();
             }
@@ -262,7 +240,6 @@ pub fn toggle_magic_dot(app: AppHandle) {
                 // Restore to last saved position, or center if no saved position
                 unsafe {
                     if let Some(saved_pos) = LAST_OVERLAY_POSITION {
-                        println!("toggle_magic_dot: Restoring to saved position ({}, {})", saved_pos.x, saved_pos.y);
                         let _ = dot.set_position(tauri::Position::Physical(saved_pos));
                     } else {
                         // Fallback to centering if no saved position
@@ -306,12 +283,10 @@ pub fn toggle_magic_dot(app: AppHandle) {
         })
         .build()
         .and_then(|w| {
-            let _ = w.show();
-            let _ = w.set_focus();
+            // Start hidden and skip taskbar - will be managed through tray
+            let _ = w.hide();
+            let _ = w.set_skip_taskbar(true);
             let _ = w.set_ignore_cursor_events(false);
-
-            // Apply stealth mode to the newly created window
-            apply_stealth_mode_to_window(app.clone(), "overlay");
 
             NotchWatcher::start(w.clone(), app.clone());
             Ok(())
@@ -322,7 +297,7 @@ pub fn toggle_magic_dot(app: AppHandle) {
 
 // Notch area constants (customize as needed)
 const NOTCH_WIDTH: i32 = 200; // Width of notch
-const NOTCH_HEIGHT: i32 = 20; // Height of notch
+const NOTCH_HEIGHT: i32 = 36; // Height of notch
 
 pub struct NotchWatcher;
 impl NotchWatcher {
@@ -385,7 +360,7 @@ pub fn start_notch_watcher(app: AppHandle) {
 pub fn enable_notch(app: AppHandle) {
     if let Some(window) = app.get_webview_window("overlay") {
         // println!("Enabling notch");
-        clear_acrylic(&window);
+        let _ = clear_acrylic(&window);
         let _ = window.set_ignore_cursor_events(true);
     }
 }
@@ -393,7 +368,6 @@ pub fn enable_notch(app: AppHandle) {
 #[tauri::command]
 pub fn enable_mouse_events(app: AppHandle) {
     if let Some(window) = app.get_webview_window("overlay") {
-        println!("Enabling mouse events");
         let _ = window.set_ignore_cursor_events(false);
     }
 }
@@ -431,7 +405,7 @@ pub fn show_magic_dot(app: AppHandle) {
         .resizable(false)
         .shadow(false)
         .always_on_top(true)
-        .inner_size(500.0, 60.0)
+        .inner_size(600.0, 60.0)
         .effects(WindowEffectsConfig {
             effects: vec![Effect::Acrylic],
             state: None,
@@ -440,12 +414,10 @@ pub fn show_magic_dot(app: AppHandle) {
         })
         .build()
         .and_then(|w| {
-            let _ = w.show();
-            let _ = w.set_focus();
+            // Start hidden and skip taskbar - will be managed through tray
+            let _ = w.hide();
+            let _ = w.set_skip_taskbar(true);
             let _ = w.set_ignore_cursor_events(false);
-
-            // Apply stealth mode to the newly created window
-            apply_stealth_mode_to_window(app.clone(), "overlay");
 
             // Emit events to prevent notch and pinning
             let _ = w.emit("disable_notch_on_show", ());
@@ -474,7 +446,6 @@ pub fn set_magic_dot_creation_enabled(enabled: bool) {
 #[tauri::command]
 pub fn close_overlay_window(app: AppHandle) {
     if let Some(window) = app.get_webview_window("overlay") {
-        println!("Closing overlay window...");
         let _ = window.close();
     }
 }

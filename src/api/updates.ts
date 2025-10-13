@@ -1,11 +1,14 @@
-{/*
+{
+  /*
   This is the updates api.
   It is used to update the user's name.
-*/}
+*/
+}
 
 import axios from "axios";
 
-const BASE_URL = "https://quackback-xwhd.onrender.com";
+export const BASE_URL = "https://quackback-xwhd.onrender.com";
+// const BASE_URL = "http://localhost:8000";
 
 export const NameUpdate = async (
   name: string,

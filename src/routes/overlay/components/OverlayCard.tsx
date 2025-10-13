@@ -1,24 +1,32 @@
 import { useEffect, useRef, useState } from "react";
-import { listen } from "@tauri-apps/api/event";
-import {
-  smoothResize,
-  pinMagicDot,
-  resize,
-  refreshStyles,
-} from "@/utils/windowUtils";
+import { emit, listen } from "@tauri-apps/api/event";
+import { smoothResize, pinMagicDot, resize } from "@/utils/windowUtils";
 import { AnimatePresence, motion } from "framer-motion";
 import { OverlayButton } from "./OverlayComponents";
 import { ChatView } from "./ChatCard";
-import { Pin, X, Mic, Maximize, Palette } from "lucide-react";
+import { Minimize2, Maximize2 } from "lucide-react";
 import notchSound from "../../../assets/sounds/bubble-pop-06-351337.mp3";
-import gradientGif from "../../../assets/gradient.gif";
 import { invoke } from "@tauri-apps/api/core";
 import { animations } from "@/constants/animations";
 import { useUserStore } from "@/store/userStore";
 import { useNoteStore } from "@/store/noteStore";
 import { GetNotes } from "@/api/notes";
-import { ArrowElbowDownLeftIcon, MicrophoneIcon, PushPinIcon } from "@phosphor-icons/react";
+import {
+  ArrowElbowDownLeftIcon,
+  ChatIcon,
+  CornersOutIcon,
+  EarIcon,
+  EarSlashIcon,
+  FileTextIcon,
+  GearSixIcon,
+  PushPinIcon,
+  XIcon,
+} from "@phosphor-icons/react";
+
+import RaeWatcher from "./RaeWatcher";
 const DEFAULT_CHAT = [480, 470];
+
+const EXPANDED_WIDTH = 248;
 
 const NOTCH_TIMEOUT = 2000;
 
@@ -30,10 +38,13 @@ const NOTCH_SHADOW = `
   0 0 0 1px rgba(255, 255, 255, 0.1)
 `;
 
-const GRADIENT_OPACITY = "";
-
 // Function to play notch collapse sound with sync with notch animation
-const playNotchSound = () => {
+const playNotchSound = (soundEnabled: boolean) => {
+  // Check if bubble sound is enabled in settings
+  if (!soundEnabled) {
+    return; // Don't play sound if disabled
+  }
+
   try {
     const audio = new Audio(notchSound);
     audio.volume = 0.3; // Set volume to 30%
@@ -43,9 +54,6 @@ const playNotchSound = () => {
   }
 };
 
-// DEV FLAG: Set to false to disable MagicDot for development
-const DEV_MAGIC_DOT_ENABLED = true;
-
 // Refs for global state
 const DISABLE_NOTCH_ON_SHOW = { current: false };
 const DISABLE_PIN_ON_SHOW = { current: false };
@@ -54,15 +62,14 @@ const DISABLE_SAFETY_NOTCH = { current: false };
 /**
  * Helper functions for notch styling and layout
  */
-const getNotchClasses = (isNotch: boolean, showGradient: boolean) => {
+const getNotchClasses = (isNotch: boolean) => {
   const baseClasses = "flex flex-col  min-h-0 overflow-hidden";
 
   if (!isNotch) return `${baseClasses} text-foreground`;
 
-  const notchClasses = "w-[360px] h-24 -mt-2 border-border backdrop-blur-sm absolute  overflow-hidden";
-  const backgroundClasses = showGradient
-    ? "bg-white/80 dark:bg-black/80"
-    : "dark:bg-black bg-white";
+  const notchClasses =
+    "w-[360px] h-24 -mt-2 border-border backdrop-blur-sm absolute  overflow-hidden";
+  const backgroundClasses = "bg-white dark:bg-black";
 
   return `${baseClasses} ${notchClasses} ${backgroundClasses}`;
 };
@@ -70,40 +77,47 @@ const getNotchClasses = (isNotch: boolean, showGradient: boolean) => {
 const getNotchStyle = (isNotch: boolean) =>
   isNotch ? { boxShadow: NOTCH_SHADOW } : {};
 
-const getGradientBackgroundStyle = (gradientGif: string) => ({
-  backgroundImage: `url(${gradientGif})`,
-  backgroundSize: 'cover',
-  backgroundPosition: 'center',
-  backgroundRepeat: 'no-repeat'
-});
-
 const Overlay = () => {
   // State for the overlay shell itself
   const [isPinned, setIsPinned] = useState(false);
   const [inputText, setInputText] = useState(""); // For the main input bar
-  const [micOn, setMicOn] = useState(false);
-  const [attachedImage, setAttachedImage] = useState<string | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [isActive, setIsActive] = useState<boolean>(() =>
-    localStorage.getItem("overlay_active") !== "false" // Default to true if not set
+  const [listening, setlistening] = useState(false);
+  const [assist, setAssist] = useState(false);
+  const [assistMessage, setAssistMessage] = useState(
+    "Hello! Assist mode is now active. How can I help you?",
   );
+  const [audioClientActive, setAudioClientActive] = useState(false);
+  const [attachedImage, setAttachedImage] = useState<string | null>(null);
+  const [bubbleSoundEnabled, setBubbleSoundEnabled] = useState<boolean>(
+    () => localStorage.getItem("bubble_sound_enabled") !== "false", // Default to true
+  );
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isActive, setIsActive] = useState<boolean>(
+    () => localStorage.getItem("overlay_active") !== "false", // Default to true if not set
+  );
+  // Handler to spawn overlay-extended window
+
   const [windowName, setWindowName] = useState("");
   const [windowIcon, setWindowIcon] = useState("");
   const [windowHwnd, setWindowHwnd] = useState<number | null>(null);
   const [isNotch, setIsNotch] = useState(false);
   const [inputActive, setInputActive] = useState(false);
-  const [showGradient, setShowGradient] = useState<boolean>(
-    localStorage.getItem("gradient") === "true"
-  );
+  // const [showApp, setShowApp] = useState(false)
+
   // Respect preference to stop analyzing after send
   useEffect(() => {
-    const unlisten = listen("overlay_request_stop_analyze", () => {
-      // Turn off active capture/analysis toggle immediately
-      setIsActive(false);
-      localStorage.setItem("overlay_active", "false");
-    });
+    let unlistenFn: (() => void) | undefined;
+
+    (async () => {
+      unlistenFn = await listen("overlay_request_stop_analyze", () => {
+        setIsActive(false);
+        localStorage.setItem("overlay_active", "false");
+      });
+      invoke("hide_app");
+    })();
+
     return () => {
-      unlisten.then((fn) => fn());
+      unlistenFn?.();
     };
   }, []);
 
@@ -115,6 +129,9 @@ const Overlay = () => {
   const [initialAttachedImage, setInitialAttachedImage] = useState<
     string | undefined
   >();
+  // Maximize state
+  const [isMaximized, setIsMaximized] = useState(false);
+  const [currentPage, setCurrentPage] = useState("chat");
 
   // Refs for dragging and notch timeout
   const notchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -137,37 +154,52 @@ const Overlay = () => {
 
   // Save isActive state to localStorage whenever it changes
   useEffect(() => {
-    console.log("🎛️ Toggle state change detected, isActive:", isActive);
+    console.log("Toggle state change detected, isActive:", isActive);
     localStorage.setItem("overlay_active", String(isActive));
-    console.log("💾 Overlay active state saved:", isActive);
+    console.log("Overlay active state saved:", isActive);
 
     // Clear screenshot when toggle is turned off
     if (!isActive) {
-      console.log("🔄 Clearing screenshot - toggle turned off");
-      console.log("📸 Before clearing, windowScreenshot length:", windowScreenshot.length);
+      console.log("Clearing screenshot - toggle turned off");
+      console.log(
+        "Before clearing, windowScreenshot length:",
+        windowScreenshot.length,
+      );
       setWindowScreenshot("");
       setShowScreenshot(false);
-      console.log("✅ Screenshot cleared - toggle turned off");
+      console.log("Screenshot cleared - toggle turned off");
     } else {
       // Capture screenshot immediately when toggle is turned on
       if (windowHwnd != null) {
-        console.log("🔄 Capturing screenshot immediately after toggle enabled...");
+        console.log(
+          "🔄 Capturing screenshot immediately after toggle enabled...",
+        );
         console.log("📍 Current windowHwnd:", windowHwnd);
 
         invoke("capture_window_screenshot_by_hwnd", {
           hwnd: windowHwnd,
-        }).then((screenshot: string) => {
-          console.log("✅ Immediate screenshot captured, length:", screenshot.length);
-          if (screenshot.length > 0) {
-            console.log("📸 Screenshot starts with:", screenshot.substring(0, 50));
-            setWindowScreenshot(screenshot);
-            console.log("💾 windowScreenshot state updated for chat functionality");
-          } else {
-            console.log("❌ Screenshot captured but empty");
-          }
-        }).catch((error) => {
-          console.error("❌ Failed to capture immediate screenshot:", error);
-        });
+        })
+          .then((screenshot: string) => {
+            console.log(
+              "✅ Immediate screenshot captured, length:",
+              screenshot.length,
+            );
+            if (screenshot.length > 0) {
+              console.log(
+                "📸 Screenshot starts with:",
+                screenshot.substring(0, 50),
+              );
+              setWindowScreenshot(screenshot);
+              console.log(
+                "💾 windowScreenshot state updated for chat functionality",
+              );
+            } else {
+              console.log("❌ Screenshot captured but empty");
+            }
+          })
+          .catch((error) => {
+            console.error("❌ Failed to capture immediate screenshot:", error);
+          });
       } else {
         console.log("⚠️ Cannot capture screenshot - windowHwnd is null");
       }
@@ -202,17 +234,31 @@ const Overlay = () => {
     };
   }, []);
 
-  // Effect to handle resizing when chat is opened/closed
+  // Effect to handle resizing when chat is opened/closed or maximized
   useEffect(() => {
-    if (showChat) {
-      resize(500, 480); // check this if working with ui
-    } else {
-      resize(500, 60); // this also 
+    if (!showChat) {
+      resize(500, 60);
+    } else if (showChat && !isMaximized) {
+      // Exit fullscreen when minimizing
+      const exitFullscreen = async () => {
+        try {
+          // const win = await getCurrentWebviewWindow();
+          // await win.setFullscreen(false);
+        } catch (error) {
+          console.error("Failed to exit fullscreen:", error);
+        }
+      };
+      // exitFullscreen();
+      // Normal chat size
+      resize(500, 580);
     }
-  }, [showChat]);
+  }, [showChat, isMaximized]);
 
   const [chatOpen, setChatOpen] = useState(false);
-  const [notchWindowDisplayEnabled, setNotchWindowDisplayEnabled] = useState(false);
+  const [notchWindowDisplayEnabled, setNotchWindowDisplayEnabled] =
+    useState(false);
+
+  // Remove jotai showAppAtom usage
 
   // Load window display preference on mount
   useEffect(() => {
@@ -221,11 +267,26 @@ const Overlay = () => {
       .catch(() => {});
   }, []);
 
+  // Emit event to main window to show/hide app
+
+  // Example: Call emitShowAppEvent(true) or emitShowAppEvent(false) where you previously setShowApp
+  // For demonstration, emit event when chat is opened/closed
+
   // Listen for preference changes from settings
   useEffect(() => {
     const unlisten = listen("notch_window_display_changed", (event) => {
       const enabled = event.payload as boolean;
       setNotchWindowDisplayEnabled(enabled);
+    });
+    return () => {
+      unlisten.then((unlisten) => unlisten());
+    };
+  }, []);
+
+  useEffect(() => {
+    const unlisten = listen("bubble_sound_enabled_changed", (event) => {
+      const enabled = (event.payload as { enabled: boolean }).enabled;
+      setBubbleSoundEnabled(enabled);
     });
     return () => {
       unlisten.then((unlisten) => unlisten());
@@ -274,7 +335,7 @@ const Overlay = () => {
               console.log("Notch enabled successfully");
               setIsNotch(true);
               // Play sound with perfect timing - synced with smooth resize animation (200ms total, play at 100ms)
-              setTimeout(() => playNotchSound(), 60);
+              setTimeout(() => playNotchSound(bubbleSoundEnabled), 60);
             })
             .catch((error) => {
               console.error("Failed to enable notch:", error);
@@ -306,23 +367,30 @@ const Overlay = () => {
       DISABLE_NOTCH_ON_SHOW.current
     ) {
       console.log(
-        "Safety: Setting fallback notch timeout (10s) due to disabled flag"
+        "Safety: Setting fallback notch timeout (10s) due to disabled flag",
       );
       setTimeout(() => {
-        if (isPinned && !showChat && !inputActive && !DISABLE_SAFETY_NOTCH.current) {
+        if (
+          isPinned &&
+          !showChat &&
+          !inputActive &&
+          !DISABLE_SAFETY_NOTCH.current
+        ) {
           console.log("Safety: Attempting to enable notch");
           DISABLE_NOTCH_ON_SHOW.current = false; // Reset the flag
           invoke("enable_notch")
             .then(() => {
               console.log("Safety: Notch enabled via fallback");
               setIsNotch(true);
-              setTimeout(() => playNotchSound(), 60);
+              setTimeout(() => playNotchSound(bubbleSoundEnabled), 60);
             })
             .catch((error) => {
               console.error("Safety: Failed to enable notch:", error);
             });
         } else if (DISABLE_SAFETY_NOTCH.current) {
-          console.log("Safety: Skipping notch enable - safety flag is active (recent center operation)");
+          console.log(
+            "Safety: Skipping notch enable - safety flag is active (recent center operation)",
+          );
         }
       }, 10000); // 10 second fallback
     }
@@ -350,7 +418,7 @@ const Overlay = () => {
     const unlisten = listen("notch-hover", () => {
       // Expand the notch when the event is received
 
-      console.log("notch-hover", isNotch, isPinned);
+      // console.log("notch-hover", isNotch, isPinned);
 
       if (notchTimeoutRef.current) {
         clearTimeout(notchTimeoutRef.current);
@@ -368,7 +436,6 @@ const Overlay = () => {
   useEffect(() => {
     const eventListeners = [
       listen("disable_notch_on_show", () => {
-        console.log("Disabling notch on show");
         DISABLE_NOTCH_ON_SHOW.current = true;
         setIsNotch(false);
         if (notchTimeoutRef.current) {
@@ -378,7 +445,6 @@ const Overlay = () => {
       }),
 
       listen("disable_pin_on_show", () => {
-        console.log("Disabling auto-pin on show");
         DISABLE_PIN_ON_SHOW.current = true;
         setIsPinned(false);
       }),
@@ -391,23 +457,13 @@ const Overlay = () => {
         }
       }),
 
-      listen("gradient_changed", (event) => {
-        console.log("OverlayCard: gradient_changed event received:", event.payload);
-        const gradient = event.payload as { gradient: boolean };
-        console.log("OverlayCard: Setting showGradient to:", gradient.gradient);
-        setShowGradient(gradient.gradient);
-      }),
-
       listen("toggle_pin_state", () => {
-        console.log("OverlayCard: Received toggle_pin_state event");
         // Reset notch disable flag when using Ctrl+P to ensure proper 2s timeout
         DISABLE_NOTCH_ON_SHOW.current = false;
-        console.log("Ctrl+P: Reset notch disable flag for proper 2s timeout");
         handlePinClick();
       }),
 
       listen("center_overlay_bar", () => {
-        console.log("OverlayCard: Received center_overlay_bar event");
         DISABLE_SAFETY_NOTCH.current = true;
         // Reset after a reasonable time (30 seconds)
         setTimeout(() => {
@@ -417,16 +473,168 @@ const Overlay = () => {
 
       // Listen for main window close to clean up overlay
       listen("main-window-closed", () => {
-        console.log("OverlayCard: Main window closed, cleaning up overlay...");
         // Clean up any overlay-specific state here if needed
         // The backend will handle closing the overlay window
-      })
+      }),
     ];
 
     return () => {
-      eventListeners.forEach(promise => promise.then(unlisten => unlisten()));
+      eventListeners.forEach((promise) =>
+        promise.then((unlisten) => unlisten()),
+      );
     };
   }, []);
+
+  // Handle assist mode changes - start/stop audio client
+  useEffect(() => {
+    const handleAssistModeChange = async () => {
+      if (assist && !audioClientActive) {
+        try {
+          console.log("🎤 Starting audio client for assist mode...");
+          setAssistMessage("Connecting to audio service...");
+
+          // Check if audio client is already running
+          const isRunning = await invoke("is_audio_client_running");
+          console.log("Audio client status:", isRunning);
+
+          if (!isRunning) {
+            await invoke("start_audio_client");
+            console.log("✅ Audio client command sent");
+          }
+
+          setAudioClientActive(true);
+
+          // Give it time to initialize
+          setTimeout(() => {
+            setAssistMessage("Listening... Speak to interact with Rae.");
+            console.log(" Audio client should be active now");
+          }, 2000);
+        } catch (error) {
+          console.error("❌ Failed to start audio client:", error);
+          setAssistMessage("Failed to start audio service");
+          setAudioClientActive(false);
+
+          // Retry after 3 seconds
+          setTimeout(() => {
+            if (assist) {
+              setAssistMessage("Retrying audio connection...");
+              handleAssistModeChange();
+            }
+          }, 3000);
+        }
+      } else if (!assist && audioClientActive) {
+        console.log("🔇 Assist mode disabled, stopping audio client...");
+        try {
+          await invoke("stop_audio_client");
+          console.log("✅ Audio client stopped successfully");
+        } catch (error) {
+          console.error("❌ Failed to stop audio client:", error);
+        }
+        setAudioClientActive(false);
+        setAssistMessage(
+          "Hello! Assist mode is now active. How can I help you?",
+        );
+      }
+    };
+
+    handleAssistModeChange();
+  }, [assist, audioClientActive]);
+
+  // Listen for audio responses from backend
+  useEffect(() => {
+    let unlistenAudioResponse: (() => void) | undefined;
+    let responseTimeoutRef: NodeJS.Timeout | null = null;
+    let statusCheckInterval: NodeJS.Timeout | null = null;
+
+    const setupAudioResponseListener = async () => {
+      try {
+        console.log("🔗 Setting up audio response listener...");
+
+        unlistenAudioResponse = await listen("audio_response", (event: any) => {
+          const data = event.payload;
+          console.log("📨 Audio response received:", data);
+
+          // Clear any existing timeout
+          if (responseTimeoutRef) {
+            clearTimeout(responseTimeoutRef);
+          }
+
+          if (data.type === "response.text.delta") {
+            console.log("📝 Delta text:", data.delta);
+            // Update assist message with streaming text
+            setAssistMessage((prev) => {
+              // If this is the first delta, replace the default/listening message
+              if (
+                prev === "Listening... Speak to interact with Rae." ||
+                prev ===
+                  "Hello! Assist mode is now active. How can I help you?" ||
+                prev === "Connecting to audio service..." ||
+                prev === "Retrying audio connection..."
+              ) {
+                return typeof data.delta === "string" ? "💬 " + data.delta : "";
+              }
+              // Otherwise append to existing message
+              return prev + (typeof data.delta === "string" ? data.delta : "");
+            });
+          }
+
+          if (data.type === "response.text.done") {
+            console.log("✅ Response completed");
+            // After response is done, reset to listening state
+            responseTimeoutRef = setTimeout(() => {
+              if (assist && audioClientActive) {
+                setAssistMessage("Listening... Speak to interact with Rae.");
+              }
+            }, 3000);
+          }
+        });
+
+        console.log("✅ Audio response listener set up successfully");
+
+        // Periodically check if audio client is still running
+        statusCheckInterval = setInterval(async () => {
+          if (assist && audioClientActive) {
+            try {
+              const isRunning = await invoke("is_audio_client_running");
+              console.log("🔍 Audio client status check:", isRunning);
+
+              if (!isRunning) {
+                console.warn(
+                  "⚠️ Audio client stopped unexpectedly, restarting...",
+                );
+                setAssistMessage("Reconnecting audio service...");
+                await invoke("start_audio_client");
+                setTimeout(() => {
+                  setAssistMessage("Listening... Speak to interact with Rae.");
+                }, 2000);
+              }
+            } catch (error) {
+              console.error("❌ Status check failed:", error);
+            }
+          }
+        }, 5000); // Check every 5 seconds
+      } catch (error) {
+        console.error("Failed to setup audio response listener:", error);
+      }
+    };
+
+    if (assist && audioClientActive) {
+      setupAudioResponseListener();
+    }
+
+    return () => {
+      if (unlistenAudioResponse) {
+        console.log("Cleaning up audio response listener");
+        unlistenAudioResponse();
+      }
+      if (responseTimeoutRef) {
+        clearTimeout(responseTimeoutRef);
+      }
+      if (statusCheckInterval) {
+        clearInterval(statusCheckInterval);
+      }
+    };
+  }, [assist, audioClientActive]);
 
   // Debug keyboard shortcut (Ctrl+Shift+D)
   useEffect(() => {
@@ -438,10 +646,9 @@ const Overlay = () => {
           showChat,
           isNotch,
           inputActive,
-          showGradient,
           disableNotch: DISABLE_NOTCH_ON_SHOW.current,
           timeoutActive: !!notchTimeoutRef.current,
-          NOTCH_TIMEOUT
+          NOTCH_TIMEOUT,
         };
 
         console.log("=== NOTCH DEBUG INFO ===");
@@ -452,7 +659,7 @@ const Overlay = () => {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isPinned, showChat, isNotch, inputActive, showGradient]);
+  }, [isPinned, showChat, isNotch, inputActive]);
 
   const handleMouseLeave = () => {
     // Only set timeout if conditions are met and notch not disabled
@@ -483,7 +690,7 @@ const Overlay = () => {
               console.log("Mouse leave: Notch enabled successfully");
               setIsNotch(true);
               // Play sound with perfect timing - synced with smooth resize animation (200ms total, play at 100ms)
-              setTimeout(() => playNotchSound(), 60);
+              setTimeout(() => playNotchSound(bubbleSoundEnabled), 60);
             })
             .catch((error) => {
               console.error("Mouse leave: Failed to enable notch:", error);
@@ -506,7 +713,7 @@ const Overlay = () => {
           isNotch,
           inputActive,
           disableNotch: DISABLE_NOTCH_ON_SHOW.current,
-        }
+        },
       );
     }
   };
@@ -549,14 +756,10 @@ const Overlay = () => {
         // Reset both disable flags when user manually pins
         DISABLE_PIN_ON_SHOW.current = false;
         DISABLE_NOTCH_ON_SHOW.current = false;
-        console.log("Pin: Reset notch disable flag for proper timing");
       }
       const newPinned = !prev;
       if (!newPinned) {
         setIsNotch(false);
-        console.log("Unpinned magic dot");
-      } else {
-        console.log("Pinning magic dot...");
       }
       if (notchTimeoutRef.current) {
         clearTimeout(notchTimeoutRef.current);
@@ -603,12 +806,6 @@ const Overlay = () => {
     // Store the attached image before clearing it
     const imageToSend = attachedImage;
 
-    console.log("🎯 Overlay: Sending message with image:", {
-      message: userMsg,
-      hasImage: !!imageToSend,
-      imageLength: imageToSend?.length || 0
-    });
-
     setChatOpen(true);
     setShowChat(true);
     setInputText("");
@@ -625,22 +822,42 @@ const Overlay = () => {
     setInitialAttachedImage(undefined); // Ensure no old attached image is passed
     setShowChat(true);
     setChatOpen(true);
-    setIsNotch(false);
+    // setIsNotch(false);
     // Reset the disable notch flag when user manually opens chat
     DISABLE_NOTCH_ON_SHOW.current = false;
     if (notchTimeoutRef.current) clearTimeout(notchTimeoutRef.current);
+    // Show main app when chat opens
   };
 
   const handleCloseChatClick = () => {
     setChatOpen(false);
     setTimeout(() => {
       setShowChat(false);
+      // Hide main app when chat closes
     }, animations.overlayChat * 1000);
     // Clear screenshot when chat is closed
     setWindowScreenshot("");
     // Clear initial states
     setInitialChatMessage(undefined);
     setInitialAttachedImage(undefined);
+  };
+
+  const handleMaximizeClick = () => {
+    setIsMaximized((current) => {
+      if (current == true) {
+        // handleCloseChatClick();
+        emit("show_app", { show: false });
+        handlePinClick();
+        resize(500, 580);
+        // setShowChat(false)
+      } else {
+        // handleCloseChatClick();
+        emit("show_app", { show: true });
+        handlePinClick();
+        resize(500, 60);
+      }
+      return !current;
+    });
   };
 
   // const [expandedChat, setExpandedChat] = useState(false);
@@ -656,7 +873,7 @@ const Overlay = () => {
       "Screenshot state changed - showScreenshot:",
       showScreenshot,
       "screenshot length:",
-      windowScreenshot.length
+      windowScreenshot.length,
     );
   }, [showScreenshot, windowScreenshot]);
 
@@ -672,7 +889,12 @@ const Overlay = () => {
     } else {
       scheduleScreenshotHide();
     }
-  }, [isHoveringTrigger, isHoveringScreenshot, showScreenshot, windowScreenshot]);
+  }, [
+    isHoveringTrigger,
+    isHoveringScreenshot,
+    showScreenshot,
+    windowScreenshot,
+  ]);
 
   // Cleanup screenshot on unmount or when window changes
   useEffect(() => {
@@ -734,17 +956,14 @@ const Overlay = () => {
   };
 
   const handleScreenshotLeave = () => {
-    console.log("Left trigger area");
     setIsHoveringTrigger(false);
   };
 
   const handleTooltipHover = () => {
-    console.log("Hovering over tooltip");
     setIsHoveringScreenshot(true);
   };
 
   const handleTooltipLeave = () => {
-    console.log("Left tooltip area");
     setIsHoveringScreenshot(false);
   };
 
@@ -755,7 +974,6 @@ const Overlay = () => {
       } justify-center ${isNotch ? "pt-2" : "p-2"} box-border`}
     >
       <motion.main
-      
         animate={
           isNotch
             ? {
@@ -763,20 +981,31 @@ const Overlay = () => {
                 y: -10,
                 borderRadius: "0 0 28px 28px",
               }
-            : {
-                scale: 1,
-                y: 0,
-                borderRadius: "12px",
-                width: DEFAULT_CHAT[0],
-                height:  DEFAULT_CHAT[1],
-              }
+            : showChat && isMaximized
+              ? {
+                  scale: 1,
+                  y: 0,
+                  borderRadius: "0px",
+                  width: EXPANDED_WIDTH,
+                  height: "100%",
+                  x: 0,
+                  top: 0,
+                  left: 0,
+                }
+              : {
+                  scale: 1,
+                  y: 0,
+                  borderRadius: "12px",
+                  width: DEFAULT_CHAT[0],
+                  height: "100%",
+                }
         }
         transition={{
           type: "tween",
           duration: animations.overlayExpand,
           ease: "circOut",
         }}
-        className={`${getNotchClasses(isNotch, showGradient)} `}
+        className={`${getNotchClasses(isNotch)} `}
         style={getNotchStyle(isNotch)}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
@@ -784,19 +1013,12 @@ const Overlay = () => {
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
       >
-        {/* Gradient background overlay */}
-        {isNotch && showGradient && (
-          <div
-            className={`absolute inset-0 ${GRADIENT_OPACITY} pointer-events-none`}
-            style={getGradientBackgroundStyle(gradientGif)}
-          />
-        )}
-
         {/* Header bar */}
         <motion.div
           animate={{
             opacity: isNotch ? 0 : 1,
             y: isNotch ? -10 : 0,
+            width: isMaximized ? EXPANDED_WIDTH : DEFAULT_CHAT[0],
             //borderBottomLeftRadius: chatOpen ? "0" : "12px", // check this if working with ui
             //borderBottomRightRadius: chatOpen ? "0" : "12px", // check this if working with ui
           }}
@@ -804,74 +1026,21 @@ const Overlay = () => {
             opacity: { duration: 0.2, ease: "easeOut" },
             y: { duration: 0.3, ease: "easeOut" },
           }}
-          className={`flex items-center z-[100000] dark:bg-[#010101] bg-white  w-full h-[44px] shrink-0 ${
+          className={`flex items-center z-[100000] dark:bg-[#010101] bg-white   h-[44px] shrink-0 ${
             !isPinned ? "drag" : ""
           } ${isNotch ? "pointer-events-none" : ""}`}
-          style={{  borderRadius: "12px" }}
+          style={{ borderRadius: "12px" }}
         >
           <div className="p-1 w-fit h-full">
             <OverlayButton
-            // className="!border-none hover:!bg-foreground/5 !aspect-auto  !rounded-l-[12px] hover:!rounded-l-[12px]"
-            customBgColor="white"
-            active={false}
-            onClick={() => setIsActive(!isActive)}
-            draggable={!isPinned}
-          >
-            <div className="relative flex items-center justify-center w-3 h-3">
-              <motion.div
-                animate={
-                  isActive
-                    ? {
-                        scale: [1, 1.15, 1],
-                        opacity: [0.9, 1, 0.9],
-                      }
-                    : {
-                        scale: 1,
-                        opacity: 0.6,
-                      }
-                }
-                transition={{
-                  duration: 1.8,
-                  repeat: isActive ? Infinity : 0,
-                  ease: "easeInOut",
-                }}
-                className={`w-1.5 h-1.5 rounded-full ${
-                  isActive
-                    ? "bg-gradient-to-br from-red-400 to-red-500 shadow-lg shadow-red-400/60 ring-1 ring-red-300/30"
-                    : "bg-gray-400 shadow-gray-400/30"
-                }`}
-              />
-              {isActive && (
-                <motion.div
-                  animate={{
-                    scale: [1, 1.3, 1],
-                    opacity: [0, 0.4, 0],
-                  }}
-                  transition={{
-                    duration: 2.2,
-                    repeat: Infinity,
-                    ease: "easeOut",
-                  }}
-                  className="absolute size-3 bg-red-400/20 rounded-full blur-sm"
-                />
-              )}
-              {isActive && (
-                <motion.div
-                  animate={{
-                    scale: [1, 1.6, 1],
-                    opacity: [0, 0.2, 0],
-                  }}
-                  transition={{
-                    duration: 2.8,
-                    repeat: Infinity,
-                    ease: "easeOut",
-                    delay: 0.3,
-                  }}
-                  className="absolute size-5 bg-red-400/10 rounded-full blur-md"
-                />
-              )}
-            </div>
-          </OverlayButton>
+              // className="!border-none hover:!bg-foreground/5 !aspect-auto  !rounded-l-[12px] hover:!rounded-l-[12px]"
+              customBgColor="white"
+              active={false}
+              onClick={() => setIsActive(!isActive)}
+              // draggable={!isPinned}
+            >
+              <RaeWatcher isActive={isActive} />
+            </OverlayButton>
           </div>
 
           <div
@@ -879,12 +1048,13 @@ const Overlay = () => {
               !isPinned ? "drag" : ""
             } flex-1 h-full flex items-center w-full`}
           >
-            {!showChat ? (
+            {!showChat && !isMaximized ? (
               inputActive ? (
                 <div
+                  key="overlay-card"
                   className={`relative flex w-full h-full items-center border-l border-border px-4 py-2 ${
                     !isPinned ? "drag" : ""
-                  } dark:bg-[#010101] bg-white max-w-xs`}
+                  }   max-w-xs`}
                 >
                   <input
                     autoFocus
@@ -934,6 +1104,7 @@ const Overlay = () => {
                 </div>
               ) : (
                 <div
+                  key="overlay-card"
                   className={`flex w-full h-full items-center border-l border-border px-4 py-2 ${
                     !isPinned ? "drag" : ""
                   } dark:bg-[#010101] max-w-xs cursor-text`}
@@ -952,11 +1123,15 @@ const Overlay = () => {
                       inputText ? "text-foreground" : "text-gray-500"
                     }`}
                   >
-                    {inputText || "Ask Rae anything..."}
+                    {listening ? (
+                      <></>
+                    ) : (
+                      <>{inputText || "Ask Rae anything..."}</>
+                    )}
                   </span>
                 </div>
               )
-            ) : isActive ? (
+            ) : isActive && !isMaximized ? (
               <div
                 className={`flex ${
                   !isPinned ? "drag" : ""
@@ -964,7 +1139,7 @@ const Overlay = () => {
                 onMouseEnter={handleScreenshotHover}
                 onMouseLeave={handleScreenshotLeave}
               >
-                <span className="select-none font-medium text-foreground/90">
+                <span className="select-none whitespace-nowrap font-medium text-foreground/90">
                   Listening to:
                 </span>
                 {windowIcon ? (
@@ -990,16 +1165,16 @@ const Overlay = () => {
                       src={windowScreenshot}
                       alt="Window screenshot"
                       className="min-w-[250px] max-h-[350px] rounded shadow-md"
-                      onLoad={() => console.log("✅ Image loaded successfully")}
-                      onError={(e) =>
-                        console.error("❌ Image failed to load:", e)
-                      }
+                      onLoad={() => {}}
+                      onError={(e) => console.error("Image failed to load:", e)}
                       style={{ imageRendering: "crisp-edges" }}
                     />
                   </div>
                 )}
               </div>
-            ) : <div className="size-full drag" ></div>}
+            ) : (
+              <div className="size-full drag"></div>
+            )}
           </div>
 
           <div className="flex items-center h-full ml-auto p-1 gap-1">
@@ -1011,40 +1186,124 @@ const Overlay = () => {
                 <ArrowElbowDownLeftIcon weight="bold" />
               </OverlayButton>
             )}
-            <OverlayButton
-              onClick={() => {setMicOn(v => !v)}}
-              active={micOn}
-              title="Voice"
-              draggable={!micOn}
-              className={micOn ? "!text-[#ffe941] dark:!text-surface " : ""}
-            >
-              <MicrophoneIcon weight={micOn ? "fill" : "bold"} />
-            </OverlayButton>
-            <OverlayButton
-              onClick={handlePinClick}
-              active={isPinned}
-              title="Pin"
-              draggable={!isPinned}
-              className={isPinned ? "!text-[#ffe941] dark:!text-surface" : ""}
-            >
-              <PushPinIcon weight={isPinned ? "fill" : "bold"} />
-            </OverlayButton>
+            {/* Hide voice and pin buttons in maximized state */}
+            {!isMaximized && (
+              <>
+                <OverlayButton
+                  onClick={() => {
+                    console.log("🎛️ Toggling assist mode...", {
+                      currentAssist: assist,
+                      audioClientActive,
+                      willBeActive: !assist,
+                    });
+                    setAssist((v) => !v);
+                  }}
+                  active={assist}
+                  title={`Voice Assistant ${assist ? "Active" : "Inactive"} - ${
+                    audioClientActive ? "Connected" : "Disconnected"
+                  }`}
+                  // draggable={!isPinned}
+                  className={
+                    assist
+                      ? audioClientActive
+                        ? "!text-[#ffe941] dark:!text-surface animate-pulse"
+                        : "!text-orange-400 dark:!text-orange-300"
+                      : ""
+                  }
+                >
+                  {assist ? (
+                    <EarIcon weight="bold" size={16} />
+                  ) : (
+                    <EarSlashIcon weight="bold" size={16} />
+                  )}
+                  {/* <EarIcon weight={listening ? "fill" : "bold"} /> */}
+                </OverlayButton>
+                <OverlayButton
+                  onClick={handlePinClick}
+                  active={isPinned}
+                  title="Pin"
+                  draggable={!isPinned}
+                  className={
+                    isPinned ? "!text-[#ffe941] dark:!text-surface" : ""
+                  }
+                >
+                  <PushPinIcon weight={isPinned ? "fill" : "bold"} />
+                </OverlayButton>
+              </>
+            )}
             {showChat ? (
-              <OverlayButton
-                onClick={handleCloseChatClick}
-                title="Close chat"
-                draggable={!isPinned}
-              >
-                <X size={16} />
-              </OverlayButton>
+              <>
+                {isMaximized && (
+                  <div className="flex h-full items-center gap-1 ">
+                    {/* Navigation buttons for maximized state - centered */}
+                    <OverlayButton
+                      onClick={() => emit("navigate_to", { to: "/app/chat" })}
+                      active={currentPage === "chat"}
+                      title="Chat"
+                      draggable={!isPinned}
+                    >
+                      <ChatIcon className="" size={16} />
+                    </OverlayButton>
+                    <OverlayButton
+                      onClick={() =>
+                        emit("navigate_to", { to: "/app/settings/preferences" })
+                      }
+                      active={currentPage === "settings"}
+                      title="Settings"
+                      draggable={!isPinned}
+                    >
+                      <GearSixIcon size={16} />
+                    </OverlayButton>
+                    <OverlayButton
+                      onClick={() =>
+                        emit("navigate_to", { to: "/app/settings/preferences" })
+                      }
+                      active={currentPage === "notes"}
+                      title="Notes"
+                      draggable={!isPinned}
+                    >
+                      <FileTextIcon size={16} />
+                    </OverlayButton>
+                  </div>
+                )}
+                <OverlayButton
+                  onClick={() => {
+                    handleMaximizeClick();
+                    // setIsMaximized(!isMaximized);
+                  }}
+                  active={isMaximized}
+                  title={isMaximized ? "Minimize" : "Maximize"}
+                  draggable={!isPinned}
+                >
+                  {isMaximized ? (
+                    <Minimize2 className="text-surface" size={16} />
+                  ) : (
+                    <Maximize2 size={16} />
+                  )}
+                </OverlayButton>
+
+                {!isMaximized && (
+                  <>
+                    <OverlayButton
+                      onClick={handleCloseChatClick}
+                      title="Close chat"
+                      draggable={!isPinned}
+                    >
+                      <XIcon weight="bold" size={16} />
+                    </OverlayButton>
+                  </>
+                )}
+              </>
             ) : (
-              <OverlayButton
-                onClick={handleOpenChat}
-                title="Open chat"
-                draggable={!isPinned}
-              >
-                <Maximize size={16} />
-              </OverlayButton>
+              <>
+                <OverlayButton
+                  onClick={handleOpenChat}
+                  title="Open chat"
+                  draggable={!isPinned}
+                >
+                  <CornersOutIcon weight="bold" size={16} />
+                </OverlayButton>
+              </>
             )}
           </div>
         </motion.div>
@@ -1064,58 +1323,7 @@ const Overlay = () => {
               className="absolute inset-0 flex items-center justify-center"
             >
               <div className="flex items-center absolute left-4">
-                <motion.div
-                  animate={
-                    isActive
-                      ? {
-                          scale: [1, 1.25, 1],
-                          opacity: [0.9, 1, 0.9],
-                        }
-                      : {
-                          scale: 1,
-                          opacity: 0.6,
-                        }
-                  }
-                  transition={{
-                    duration: 2,
-                    repeat: isActive ? Infinity : 0,
-                    ease: "easeInOut",
-                  }}
-                  className={`w-1.5 h-1.5 rounded-full ${
-                    isActive
-                      ? "bg-gradient-to-br from-red-400 to-red-500 shadow-xl shadow-red-400/70 ring-2 ring-red-300/40"
-                      : "bg-gray-400 shadow-gray-400/30"
-                  }`}
-                />
-                {isActive && (
-                  <motion.div
-                    animate={{
-                      scale: [1, 1.8, 1],
-                      opacity: [0, 0.5, 0],
-                    }}
-                    transition={{
-                      duration: 2.5,
-                      repeat: Infinity,
-                      ease: "easeOut",
-                    }}
-                    className="absolute size-3 bg-red-400/25 rounded-full -ml-1.5 blur-sm"
-                  />
-                )}
-                {isActive && (
-                  <motion.div
-                    animate={{
-                      scale: [1, 2.2, 1],
-                      opacity: [0, 0.3, 0],
-                    }}
-                    transition={{
-                      duration: 3.2,
-                      repeat: Infinity,
-                      ease: "easeOut",
-                      delay: 0.5,
-                    }}
-                    className="absolute size-5 bg-red-400/15 rounded-full -ml-2.5 blur-lg"
-                  />
-                )}
+                <RaeWatcher isActive={isActive} />
               </div>
 
               {/* App information in notch */}
@@ -1142,21 +1350,25 @@ const Overlay = () => {
         </AnimatePresence>
 
         <AnimatePresence mode="sync">
-          {chatOpen && (
+          {chatOpen && !isMaximized && (
             <ChatView
-              setChatOpen={setChatOpen}
-
               onClose={handleCloseChatClick}
               initialMessage={initialChatMessage}
               initialAttachedImage={initialAttachedImage}
               smoothResize={smoothResize}
-              showChat={showChat}
-              setShowChat={setShowChat}
               windowName={windowName}
               windowIcon={windowIcon}
-
+              windowHwnd={windowHwnd}
               windowScreenshot={windowScreenshot}
               isActive={isActive}
+              isMaximized={isMaximized}
+              setIsMaximized={setIsMaximized}
+              isPinned={isPinned}
+              currentPage={currentPage}
+              setCurrentPage={setCurrentPage}
+              assist={assist}
+              assistMessage={assistMessage}
+              setAssistMessage={setAssistMessage}
             />
           )}
         </AnimatePresence>

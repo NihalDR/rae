@@ -175,15 +175,15 @@ const Sidebar = () => {
         >
           New chat
         </SidebarButton>
-        <div className="flex overflow-hidden relative">
+        <div className="flex overflow-hidden relative w-full">
           {/* <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-background/50 to-transparent h-[40px] z-30" ></div> */}
-          <motion.div animate={{opacity: expanded ? 1 : 0}} className="flex flex-col gap-1 overflow-y-auto overflow-x-hidden relative">
+          <motion.div animate={{opacity: expanded ? 1 : 0}} className="flex flex-col gap-1 overflow-y-auto overflow-x-hidden relative w-full">
           
           {Array.isArray(convoHistory) &&
             convoHistory.map((convo) => (
               <div
                 key={convo.id}
-                className={`dark:bg-zinc-900/0 ${currentConvoId == convo.id ? "dark:!bg-zinc-800 dark:!text-zinc-200" : ""} h-[32px] items-center shrink-0 whitespace-nowrap px-4 rounded-lg overflow-hidden dark:text-zinc-400 hover:dark:bg-zinc-800 transition-colors duration-100 cursor-pointer text-sm font-medium py-2`}
+                className={`dark:bg-zinc-900/0 ${currentConvoId == convo.id ? "dark:!bg-zinc-800 dark:!text-zinc-200" : ""} h-[32px] items-center shrink-0 whitespace-nowrap px-4 rounded-lg overflow-hidden dark:text-zinc-400 hover:dark:bg-zinc-800 transition-colors duration-100 cursor-pointer text-sm font-medium py-2 w-full`}
                 onClick={() => {
                   console.log("Selected chat:", convo.title);
                   console.log("Chat messages:", convo);
