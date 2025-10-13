@@ -38,26 +38,87 @@ const NOTCH_SHADOW = `
   0 0 0 1px rgba(255, 255, 255, 0.1)
 `;
 
-// Function to play notch collapse sound with sync with notch animation
-const playNotchSound = (soundEnabled: boolean) => {
-  // Check if bubble sound is enabled in settings
-  if (!soundEnabled) {
-    return; // Don't play sound if disabled
-  }
+// Audio Manager - handles all audio-related functionality
+const createAudioManager = () => {
+  const playNotchSound = (soundEnabled: boolean) => {
+    // Check if bubble sound is enabled in settings
+    if (!soundEnabled) {
+      return; // Don't play sound if disabled
+    }
 
-  try {
-    const audio = new Audio(notchSound);
-    audio.volume = 0.3; // Set volume to 30%
-    audio.play().catch((err) => console.log("Sound play failed:", err));
-  } catch (error) {
-    console.log("Audio playback error:", error);
-  }
+    try {
+      const audio = new Audio(notchSound);
+      audio.volume = 0.3; // Set volume to 30%
+      audio.play().catch((err) => console.error("Sound play failed:", err));
+    } catch (error) {
+      console.error("Audio playback error:", error);
+    }
+  };
+
+  return {
+    playNotchSound
+  };
 };
 
 // Refs for global state
 const DISABLE_NOTCH_ON_SHOW = { current: false };
 const DISABLE_PIN_ON_SHOW = { current: false };
 const DISABLE_SAFETY_NOTCH = { current: false };
+
+// Notch Controller - manages all notch-related state and logic
+const createNotchController = () => {
+  let notchTimeoutRef: NodeJS.Timeout | null = null;
+
+  const clearNotchTimeout = () => {
+    if (notchTimeoutRef) {
+      clearTimeout(notchTimeoutRef);
+      notchTimeoutRef = null;
+    }
+  };
+
+  const setNotchTimeout = (callback: () => void, delay: number) => {
+    clearNotchTimeout();
+    notchTimeoutRef = setTimeout(callback, delay);
+  };
+
+  const shouldEnableNotch = (
+    isPinned: boolean,
+    showChat: boolean,
+    isNotch: boolean,
+    inputActive: boolean
+  ) => {
+    return (
+      isPinned &&
+      !showChat &&
+      !isNotch &&
+      !inputActive &&
+      !DISABLE_NOTCH_ON_SHOW.current
+    );
+  };
+
+  const getNotchDebugInfo = (
+    isPinned: boolean,
+    showChat: boolean,
+    isNotch: boolean,
+    inputActive: boolean
+  ) => {
+    return {
+      isPinned,
+      showChat,
+      isNotch,
+      inputActive,
+      disableNotch: DISABLE_NOTCH_ON_SHOW.current,
+      timestamp: new Date().toISOString(),
+    };
+  };
+
+  return {
+    clearNotchTimeout,
+    setNotchTimeout,
+    shouldEnableNotch,
+    getNotchDebugInfo
+  };
+};
 
 /**
  * Helper functions for notch styling and layout
@@ -76,6 +137,164 @@ const getNotchClasses = (isNotch: boolean) => {
 
 const getNotchStyle = (isNotch: boolean) =>
   isNotch ? { boxShadow: NOTCH_SHADOW } : {};
+
+// Screenshot Manager - handles all screenshot capture and visibility logic
+const createScreenshotManager = () => {
+  const hideTimeoutRef = { current: null as NodeJS.Timeout | null };
+
+  const cancelHideTimeout = () => {
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+  };
+
+  const hideScreenshot = (setShowScreenshot: (show: boolean) => void) => {
+    setShowScreenshot(false);
+    // Don't clear windowScreenshot here - keep it for chat functionality
+  };
+
+  const scheduleHideTimeout = (setShowScreenshot: (show: boolean) => void) => {
+    cancelHideTimeout();
+    hideTimeoutRef.current = setTimeout(() => {
+      hideScreenshot(setShowScreenshot);
+      hideTimeoutRef.current = null;
+    }, 200);
+  };
+
+  const captureScreenshot = async (
+    windowHwnd: number | null,
+    isActive: boolean,
+    setWindowScreenshot: (screenshot: string) => void
+  ) => {
+    // Only capture screenshot if the green toggle is active
+    if (!isActive) {
+      return;
+    }
+
+    try {
+      if (windowHwnd == null) return;
+      const screenshot = (await invoke("capture_window_screenshot_by_hwnd", {
+        hwnd: windowHwnd,
+      })) as string;
+      setWindowScreenshot(screenshot);
+    } catch (error) {
+      console.error("Failed to capture screenshot:", error);
+    }
+  };
+
+  return {
+    cancelHideTimeout,
+    hideScreenshot,
+    scheduleHideTimeout,
+    captureScreenshot
+  };
+};
+
+// Timer Manager - handles all timeout-related functionality
+const createTimerManager = () => {
+  const timeouts = new Map<string, NodeJS.Timeout>();
+
+  const setTimeout = (key: string, callback: () => void, delay: number) => {
+    clearTimeout(key);
+    timeouts.set(key, global.setTimeout(callback, delay));
+  };
+
+  const clearTimeout = (key: string) => {
+    const timeout = timeouts.get(key);
+    if (timeout) {
+      global.clearTimeout(timeout);
+      timeouts.delete(key);
+    }
+  };
+
+  const clearAllTimeouts = () => {
+    timeouts.forEach((timeout) => global.clearTimeout(timeout));
+    timeouts.clear();
+  };
+
+  return {
+    setTimeout,
+    clearTimeout,
+    clearAllTimeouts
+  };
+};
+
+// Event Handler Factory - creates reusable event handlers
+const createEventHandlerFactory = (
+  notchController: any,
+  audioManager: any,
+  inputActiveRef: any
+) => {
+  const createMouseEnterHandler = (
+    isPinned: boolean,
+    showChat: boolean,
+    isNotch: boolean,
+    inputActive: boolean,
+    bubbleSoundEnabled: boolean,
+    setIsNotch: (isNotch: boolean) => void
+  ) => {
+    return () => {
+      // Clear any pending notch timeout
+      notchController.clearNotchTimeout();
+
+      // If we're in notch mode, expand it
+      if (isNotch) {
+        setIsNotch(false);
+        audioManager.playNotchSound(bubbleSoundEnabled);
+      } else {
+        // If we should enable notch, set a timeout
+        if (notchController.shouldEnableNotch(isPinned, showChat, isNotch, inputActive)) {
+          notchController.setNotchTimeout(() => {
+            if (notchController.shouldEnableNotch(isPinned, showChat, isNotch, inputActive)) {
+              setIsNotch(true);
+              audioManager.playNotchSound(bubbleSoundEnabled);
+            }
+          }, 2000);
+        }
+      }
+    };
+  };
+
+  const createMouseLeaveHandler = (
+    isPinned: boolean,
+    showChat: boolean,
+    isNotch: boolean,
+    inputActive: boolean,
+    bubbleSoundEnabled: boolean,
+    setIsNotch: (isNotch: boolean) => void
+  ) => {
+    return () => {
+      // Set notch timeout if conditions are met
+      if (notchController.shouldEnableNotch(isPinned, showChat, isNotch, inputActive)) {
+        notchController.setNotchTimeout(() => {
+          // Double check conditions when timeout fires and notch not disabled
+          if (
+            !inputActiveRef.current &&
+            isPinned &&
+            !showChat &&
+            !DISABLE_NOTCH_ON_SHOW.current
+          ) {
+            invoke("enable_notch")
+              .then(() => {
+                setIsNotch(true);
+                // Play sound with perfect timing - synced with smooth resize animation (200ms total, play at 100ms)
+                setTimeout(() => audioManager.playNotchSound(bubbleSoundEnabled), 60);
+              })
+              .catch((error) => {
+                console.error("Failed to enable notch:", error);
+              });
+          }
+        }, NOTCH_TIMEOUT);
+      }
+    };
+  };
+
+  return {
+    createMouseEnterHandler,
+    createMouseLeaveHandler
+  };
+};
 
 const Overlay = () => {
   // State for the overlay shell itself
@@ -103,6 +322,24 @@ const Overlay = () => {
   const [isNotch, setIsNotch] = useState(false);
   const [inputActive, setInputActive] = useState(false);
   // const [showApp, setShowApp] = useState(false)
+
+  // Initialize managers
+  const audioManager = createAudioManager();
+  const notchController = createNotchController();
+  const screenshotManager = createScreenshotManager();
+  const timerManager = createTimerManager();
+  const inputActiveRef = useRef(inputActive);
+
+  // Keep inputActiveRef in sync with state
+  useEffect(() => {
+    inputActiveRef.current = inputActive;
+  }, [inputActive]);
+
+  const eventHandlerFactory = createEventHandlerFactory(
+    notchController,
+    audioManager,
+    inputActiveRef
+  );
 
   // Respect preference to stop analyzing after send
   useEffect(() => {
@@ -135,9 +372,8 @@ const Overlay = () => {
 
   // Refs for dragging and notch timeout
   const notchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const inputActiveRef = useRef(inputActive);
-  const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef<{ x: number; y: number } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const { email } = useUserStore();
   const { setNotes } = useNoteStore();
   const fetchNotes = async () => {
@@ -305,7 +541,7 @@ const Overlay = () => {
             .then(() => {
               setIsNotch(true);
               // Play sound with perfect timing - synced with smooth resize animation (200ms total, play at 100ms)
-              setTimeout(() => playNotchSound(bubbleSoundEnabled), 60);
+              setTimeout(() => audioManager.playNotchSound(bubbleSoundEnabled), 60);
             })
             .catch((error) => {
               console.error("Failed to enable notch:", error);
@@ -338,7 +574,7 @@ const Overlay = () => {
             .then(() => {
               console.log("Safety: Notch enabled via fallback");
               setIsNotch(true);
-              setTimeout(() => playNotchSound(bubbleSoundEnabled), 60);
+              setTimeout(() => audioManager.playNotchSound(bubbleSoundEnabled), 60);
             })
             .catch((error) => {
               console.error("Safety: Failed to enable notch:", error);
@@ -359,17 +595,14 @@ const Overlay = () => {
     };
   }, [isPinned, showChat, isNotch, inputActive]);
 
-  const handleMouseEnter = () => {
-    // // Always clear any pending timeouts
-    // if (notchTimeoutRef.current) {
-    //   clearTimeout(notchTimeoutRef.current);
-    //   notchTimeoutRef.current = null;
-    // }
-    // // Clear notch if it's showing and we're pinned
-    // if (isNotch && isPinned) {
-    //   setIsNotch(false);
-    // }
-  };
+  const handleMouseEnter = eventHandlerFactory.createMouseEnterHandler(
+    isPinned,
+    showChat,
+    isNotch,
+    inputActive,
+    bubbleSoundEnabled,
+    setIsNotch
+  );
   useEffect(() => {
     const unlisten = listen("notch-hover", () => {
       // Expand the notch when the event is received
@@ -617,62 +850,14 @@ const Overlay = () => {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isPinned, showChat, isNotch, inputActive]);
 
-  const handleMouseLeave = () => {
-    // Only set timeout if conditions are met and notch not disabled
-    if (
-      isPinned &&
-      !showChat &&
-      !isNotch &&
-      !inputActive &&
-      !DISABLE_NOTCH_ON_SHOW.current
-    ) {
-      console.log("Mouse leave: Setting notch timeout");
-      // Clear any existing timeout first
-      if (notchTimeoutRef.current) {
-        clearTimeout(notchTimeoutRef.current);
-      }
-
-      notchTimeoutRef.current = setTimeout(() => {
-        // Double check conditions when timeout fires and notch not disabled
-        if (
-          !inputActiveRef.current &&
-          isPinned &&
-          !showChat &&
-          !DISABLE_NOTCH_ON_SHOW.current
-        ) {
-          console.log("Mouse leave: Enabling notch - all conditions met");
-          invoke("enable_notch")
-            .then(() => {
-              console.log("Mouse leave: Notch enabled successfully");
-              setIsNotch(true);
-              // Play sound with perfect timing - synced with smooth resize animation (200ms total, play at 100ms)
-              setTimeout(() => playNotchSound(bubbleSoundEnabled), 60);
-            })
-            .catch((error) => {
-              console.error("Mouse leave: Failed to enable notch:", error);
-            });
-        } else {
-          console.log("Mouse leave: Notch conditions not met at timeout:", {
-            inputActive: inputActiveRef.current,
-            isPinned,
-            showChat,
-            disableNotch: DISABLE_NOTCH_ON_SHOW.current,
-          });
-        }
-      }, NOTCH_TIMEOUT);
-    } else {
-      console.log(
-        "Mouse leave: Not setting notch timeout - conditions not met:",
-        {
-          isPinned,
-          showChat,
-          isNotch,
-          inputActive,
-          disableNotch: DISABLE_NOTCH_ON_SHOW.current,
-        },
-      );
-    }
-  };
+  const handleMouseLeave = eventHandlerFactory.createMouseLeaveHandler(
+    isPinned,
+    showChat,
+    isNotch,
+    inputActive,
+    bubbleSoundEnabled,
+    setIsNotch
+  );
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!isPinned) {
@@ -838,12 +1023,12 @@ const Overlay = () => {
     const isAnyHovering = isHoveringTrigger || isHoveringScreenshot;
 
     if (isAnyHovering) {
-      cancelScreenshotHide();
+      screenshotManager.cancelHideTimeout();
       if (!showScreenshot && windowScreenshot) {
         setShowScreenshot(true);
       }
     } else {
-      scheduleScreenshotHide();
+      screenshotManager.scheduleHideTimeout(setShowScreenshot);
     }
   }, [
     isHoveringTrigger,
@@ -855,60 +1040,20 @@ const Overlay = () => {
   // Cleanup screenshot on unmount or when window changes
   useEffect(() => {
     return () => {
-      if (screenshotHideTimeoutRef.current) {
-        clearTimeout(screenshotHideTimeoutRef.current);
-      }
-      hideScreenshot();
+      screenshotManager.cancelHideTimeout();
+      screenshotManager.hideScreenshot(setShowScreenshot);
     };
   }, []);
 
   // Clear screenshot when window changes
   useEffect(() => {
-    hideScreenshot();
+    screenshotManager.hideScreenshot(setShowScreenshot);
   }, [windowName, windowIcon, windowHwnd]);
 
-  const cancelScreenshotHide = () => {
-    if (screenshotHideTimeoutRef.current) {
-      clearTimeout(screenshotHideTimeoutRef.current);
-      screenshotHideTimeoutRef.current = null;
-    }
-  };
-
-  const hideScreenshot = () => {
-    setShowScreenshot(false);
-    // Don't clear windowScreenshot here - keep it for chat functionality
-    // setWindowScreenshot(""); // Commented out to preserve screenshot for chat
-  };
-
-  const scheduleScreenshotHide = () => {
-    cancelScreenshotHide(); // Clear any existing timeout first
-    screenshotHideTimeoutRef.current = setTimeout(() => {
-      hideScreenshot();
-      screenshotHideTimeoutRef.current = null;
-    }, 200); // Reduced delay for better responsiveness
-  };
 
   const handleScreenshotHover = async () => {
-    console.log("Hover triggered - capturing screenshot...");
     setIsHoveringTrigger(true);
-
-    // Only capture screenshot if the green toggle is active
-    if (!isActive) {
-      console.log("Screenshot capture skipped - green toggle is off");
-      return;
-    }
-
-    try {
-      if (windowHwnd == null) return;
-      const screenshot = (await invoke("capture_window_screenshot_by_hwnd", {
-        hwnd: windowHwnd,
-      })) as string;
-      console.log("Screenshot received, length:", screenshot.length);
-      console.log("Screenshot starts with:", screenshot.substring(0, 50));
-      setWindowScreenshot(screenshot);
-    } catch (error) {
-      console.error("Failed to capture screenshot:", error);
-    }
+    await screenshotManager.captureScreenshot(windowHwnd, isActive, setWindowScreenshot);
   };
 
   const handleScreenshotLeave = () => {
