@@ -8,29 +8,37 @@ import { LogicalPosition } from "@tauri-apps/api/dpi";
 import { AnimatePresence, motion } from "motion/react";
 import { currentMonitor, getAllWindows } from "@tauri-apps/api/window";
 
-export default function MainApp() {
-  const navigate = useNavigate();
+// Navigation Manager - handles all navigation-related functionality
+const createNavigationManager = (navigate: (to: string) => void) => {
+  const handleNavigationEvent = (event: { to: string }) => {
+    navigate(event.to);
+  };
 
-  const [showApp, setShowApp] = useState(false);
-  const followFrame = useRef<number | null>(null);
-  const following = useRef(false);
-
-  useEffect(() => {
+  const setupNavigationListener = () => {
     let unlisten: (() => void) | undefined;
 
-    listen<{to: string}>("navigate_to", async (event) => {
-      console.log("triggered unlisten")
-      navigate(event.payload.to)
+    listen<{ to: string }>("navigate_to", async (event) => {
+      handleNavigationEvent(event.payload);
     }).then((fn) => {
       unlisten = fn;
-    })
+    });
 
-    return ( ) => {
-      if (unlisten) unlisten()
-    }
-  }, [navigate]);
+    return () => {
+      if (unlisten) unlisten();
+    };
+  };
 
-  async function followOverlay() {
+  return {
+    setupNavigationListener
+  };
+};
+
+// Window Follower Manager - handles window following logic
+const createWindowFollowerManager = () => {
+  const followFrame = { current: null as number | null };
+  const following = { current: false };
+
+  const followOverlay = async () => {
     if (!following.current) return;
 
     try {
@@ -52,23 +60,103 @@ export default function MainApp() {
     }
 
     followFrame.current = requestAnimationFrame(followOverlay);
-  }
+  };
 
-  function startFollowingOverlay() {
+  const startFollowing = () => {
     if (!following.current) {
       following.current = true;
       followOverlay();
     }
-  }
+  };
 
-  function stopFollowingOverlay() {
+  const stopFollowing = () => {
     following.current = false;
-    if (followFrame.current) cancelAnimationFrame(followFrame.current);
-  }
+    if (followFrame.current) {
+      cancelAnimationFrame(followFrame.current);
+      followFrame.current = null;
+    }
+  };
 
-  // Handle app navigation
-  useEffect(() => {
+  return {
+    startFollowing,
+    stopFollowing
+  };
+};
+
+// App Visibility Manager - handles app show/hide logic
+const createAppVisibilityManager = (
+  setShowApp: (show: boolean) => void,
+  windowFollower: any
+) => {
+  const showApp = async () => {
+    try {
+      const win = getCurrentWebviewWindow();
+
+      invoke("show_app");
+
+      // Position window relative to overlay first
+      const overlayWindow = (await getAllWindows()).find(
+        (w) => w.label === "overlay"
+      );
+
+      if (overlayWindow) {
+        const overlayPosition = await overlayWindow.outerPosition();
+        await win.setPosition(
+          new LogicalPosition(
+            overlayPosition.x + 240 - 500,
+            overlayPosition.y + 60
+          )
+        );
+      }
+
+      // Update state and start following
+      setShowApp(true);
+      await win.setFocus();
+      windowFollower.startFollowing();
+    } catch (error) {
+      console.error("Failed to show app:", error);
+    }
+  };
+
+  const hideApp = async () => {
+    try {
+      invoke("hide_app");
+      windowFollower.stopFollowing();
+      setShowApp(false);
+    } catch (error) {
+      console.error("Failed to hide app:", error);
+    }
+  };
+
+  const setupAppVisibilityListener = () => {
     let unlisten: (() => void) | undefined;
+
+    listen<{ show: boolean }>("show_app", async (event) => {
+      if (event.payload.show) {
+        await showApp();
+      } else {
+        await hideApp();
+      }
+    }).then((fn) => {
+      unlisten = fn;
+    });
+
+    return () => {
+      if (unlisten) unlisten();
+      windowFollower.stopFollowing();
+    };
+  };
+
+  return {
+    setupAppVisibilityListener
+  };
+};
+
+// Event Listener Manager - handles Tauri event listeners
+const createEventListenerManager = (navigate: (to: string) => void) => {
+  const setupTransferChatListener = () => {
+    let unlisten: (() => void) | undefined;
+
     listen<{ navigate?: boolean }>("rae:transfer-chat", (event) => {
       if (event?.payload?.navigate) {
         navigate("/app/chat");
@@ -76,65 +164,38 @@ export default function MainApp() {
     }).then((fn) => {
       unlisten = fn;
     });
+
     return () => {
       if (unlisten) unlisten();
     };
-  }, [navigate]);
-
-  // Listen for overlay show/hide
-  useEffect(() => {
-  let unlisten: (() => void) | undefined;
-
-  listen<{ show: boolean }>("show_app", async (event) => {
-    console.log("triggered");
-
-    try {
-      const win = getCurrentWebviewWindow();
-
-      if (event.payload.show) {
-        invoke("show_app");
-        console.log("showing app");
-
-        // 🔥 First, position window relative to overlay
-        const overlayWindow = (await getAllWindows()).find(
-          (w) => w.label === "overlay"
-        );
-
-        if (overlayWindow) {
-          const overlayPosition = await overlayWindow.outerPosition();
-          await win.setPosition(
-            new LogicalPosition(
-              overlayPosition.x + 240 - 500,
-              overlayPosition.y + 60
-            )
-          );
-        }
-
-        // Then update state
-        setShowApp(true);
-
-        // And only then start following
-        await win.setFocus();
-        startFollowingOverlay();
-      } else {
-        invoke("hide_app");
-        stopFollowingOverlay();
-        setShowApp(false);
-      }
-    } catch (error) {
-      console.error(error);
-    }
-  }).then((fn) => {
-    unlisten = fn;
-  });
-
-  return () => {
-    if (unlisten) unlisten();
-    stopFollowingOverlay();
   };
-}, []);
 
+  return {
+    setupTransferChatListener
+  };
+};
 
+export default function MainApp() {
+  const navigate = useNavigate();
+
+  const [showApp, setShowApp] = useState(false);
+
+  // Initialize managers
+  const navigationManager = createNavigationManager(navigate);
+  const windowFollower = createWindowFollowerManager();
+  const appVisibilityManager = createAppVisibilityManager(setShowApp, windowFollower);
+  const eventListenerManager = createEventListenerManager(navigate);
+
+  // Setup navigation listener
+  useEffect(navigationManager.setupNavigationListener, [navigate]);
+
+  // Setup transfer chat listener
+  useEffect(eventListenerManager.setupTransferChatListener, [navigate]);
+
+  // Setup app visibility listener
+  useEffect(appVisibilityManager.setupAppVisibilityListener, []);
+
+  // Enable magic dot creation
   useEffect(() => {
     invoke("set_magic_dot_creation_enabled", { enabled: true }).catch(() => {});
   }, []);
