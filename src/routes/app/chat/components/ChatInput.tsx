@@ -10,20 +10,22 @@ interface ChatInputProps {
   onSend?: (msg: string, image?: string) => void;
   onWebSearch?: (msg: string, image?: string) => void;
   onSupermemory?: (msg: string, image?: string) => void;
+  onImageGeneration?: (msg: string, image?: string) => void;
   currentModel?: { label: string; value: string };
   setCurrentModel?: (model: { label: string; value: string }) => void;
   models?: { label: string; value: string }[];
   initialMessage?: string | null;
   onTypingChange?: (isTyping: boolean) => void;
   onMessageChange?: (message: string) => void;
-  selectedTool?: 0 | 1 | 2;
-  onToolChange?: (tool: 0 | 1 | 2) => void;
+  selectedTool?: 0 | 1 | 2 | 4;
+  onToolChange?: (tool: 0 | 1 | 2 | 4) => void;
 }
 
 const ChatInput: React.FC<ChatInputProps> = ({
   onSend,
   onWebSearch,
   onSupermemory,
+  onImageGeneration,
   currentModel,
   setCurrentModel,
   models: modelsProp,
@@ -40,6 +42,9 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const [isTyping, setIsTyping] = useState(false);
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [hoveredImageIndex, setHoveredImageIndex] = useState<number | null>(
+    null,
+  );
 
   // Use local model state if not controlled
   const defaultModels = [
@@ -111,6 +116,20 @@ const ChatInput: React.FC<ChatInputProps> = ({
     }
   };
 
+  const handleImageGeneration = () => {
+    if (!message.trim()) return;
+    if (onImageGeneration)
+      onImageGeneration(message, attachedImage || undefined);
+    setMessage("");
+    setIsTyping(false);
+    setAttachedImage(null);
+    setImagePreview(null);
+    if (chatInputRef.current) {
+      chatInputRef.current.value = "";
+      autosize.update(chatInputRef.current);
+    }
+  };
+
   // Handle image paste
   const handlePaste = (e: React.ClipboardEvent) => {
     const items = e.clipboardData?.items;
@@ -118,7 +137,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
 
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
-      if (item.type.indexOf('image') !== -1) {
+      if (item.type.indexOf("image") !== -1) {
         e.preventDefault();
         const file = item.getAsFile();
         if (file) {
@@ -141,6 +160,33 @@ const ChatInput: React.FC<ChatInputProps> = ({
     setImagePreview(null);
   };
 
+  const handleReferenceImage = (imageBase64: string) => {
+    setAttachedImage(imageBase64);
+    setImagePreview(imageBase64);
+
+    // If not already on image generation tool, switch to it for better workflow
+    if (selectedTool !== 4 && onToolChange) {
+      onToolChange(4);
+    }
+  };
+
+  const getPlaceholderText = () => {
+    if (attachedImage) {
+      return "Describe what you want to know about this image...";
+    }
+
+    switch (selectedTool) {
+      case 1:
+        return "Web search me...";
+      case 2:
+        return "Super memory search...";
+      case 4:
+        return "Generate or modify image...";
+      default:
+        return "Enter your message or paste a screensho";
+    }
+  };
+
   const handleInputChange = (value: string) => {
     setMessage(value);
     const typing = value.length > 0;
@@ -153,22 +199,53 @@ const ChatInput: React.FC<ChatInputProps> = ({
     }
   };
 
+  const handleSendMessage = () => {
+    if (selectedTool === 1) {
+      handleWebSearch();
+    } else if (selectedTool === 2) {
+      handleSupermemory();
+    } else if (selectedTool === 4) {
+      handleImageGeneration();
+    } else {
+      handleSend();
+    }
+  };
+
   return (
     <div className=" bottom-0  h-fit  text-foreground w-full flex items-center justify-center z-50 p-2">
       <div className="bg-card/50 w-full h-fit border flex flex-col transition-all rounded-lg border-border group focus-within:border-foreground/20 ">
         <div className="relative">
+          {/* Tool indicator */}
+          <AnimatePresence>
+            {selectedTool > 0 && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                className="absolute left-2 top-2 z-10"
+              >
+                <div className="text-red-500">
+                  {selectedTool === 1 && <Globe size={18} />}
+                  {selectedTool === 2 && <Brain size={18} />}
+                  {selectedTool === 4 && <Image size={18} />}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
           <textarea
-            onChange={() => handleInputChange(chatInputRef.current?.value ?? "")}
+            onChange={() =>
+              handleInputChange(chatInputRef.current?.value ?? "")
+            }
             onPaste={handlePaste}
             ref={chatInputRef}
-            placeholder={attachedImage ? "Describe what you want to know about this image..." : "Enter your message or paste a screenshot"}
+            placeholder={getPlaceholderText()}
             name=""
             id=""
-            className="size-full min-h-[60px] placeholder:text-foreground/40 resize-none outline-none text-sm p-2 pr-12"
+            className={`size-full min-h-[60px] placeholder:text-foreground/40 resize-none outline-none text-sm pr-12 ${selectedTool > 0 ? "pl-12" : "p-2"}`}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
-                if (!disabled) handleSend();
+                if (!disabled) handleSendMessage();
               }
             }}
           ></textarea>
@@ -255,7 +332,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
               className={`rounded-lg  size-full  p-0 flex items-center justify-center ${
                 disabled && "!bg-foreground/5 !text-foreground/20"
               }`}
-              onClick={handleSend}
+              onClick={handleSendMessage}
             >
               <Send size={14}></Send>
             </Button>

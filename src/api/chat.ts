@@ -6,7 +6,7 @@
 import axios from "axios";
 
 export const BASE_URL = "https://quackback-xwhd.onrender.com/api";
-
+//export const BASE_URL = "http://localhost:8000/api";
 export const Generate = async ({
   email,
   message,
@@ -14,13 +14,27 @@ export const Generate = async ({
   conversationId,
   provider,
   modelName,
-  image, //todo
-  tool = 0, // default to infinite chat
+  image,
+  tool = 0,
+  files,
 }): Promise<any> => {
   try {
     let res;
+    let normalizedImage: string[];
+    
+    if (Array.isArray(image)) {
+      // If it's already an array, filter out empty strings
+      const validImages = image.filter(img => img && typeof img === 'string' && img.trim() !== '');
+      normalizedImage = validImages.length > 0 ? validImages : [''];
+    } else if (typeof image === 'string' && image.trim() !== '') {
+      // If it's a non-empty string, wrap in array
+      normalizedImage = [image];
+    } else {
+      // If it's undefined, null, empty string, or anything else, use [""]
+      normalizedImage = [''];
+    }
 
-    if (image || tool) {
+    if (normalizedImage.some(img => img !== '') || tool) {
       // Normal axios request
       res = await axios.post(`${BASE_URL}/generate/msg`, {
         email,
@@ -29,12 +43,25 @@ export const Generate = async ({
         conversationId,
         provider,
         modelName,
-        image,
+        image: normalizedImage,
         tool,
+        files,
       });
       return res.data;
     } else {
-
+      // Handle the else case (you had an empty else block)
+      res = await axios.post(`${BASE_URL}/generate/msg`, {
+        email,
+        message,
+        newConvo,
+        conversationId,
+        provider,
+        modelName,
+        image: normalizedImage,
+        tool,
+        files,
+      });
+      return res.data;
     }
   } catch (err: any) {
     const message =
@@ -45,7 +72,6 @@ export const Generate = async ({
     };
   }
 };
-
 // Web search function using tool 1
 export const GenerateWithWebSearch = async ({
   email,
@@ -54,7 +80,7 @@ export const GenerateWithWebSearch = async ({
   conversationId,
   provider,
   modelName,
-  image = "",
+  image = [""],
 }): Promise<any> => {
   return Generate({
     email,
@@ -65,6 +91,7 @@ export const GenerateWithWebSearch = async ({
     modelName,
     image,
     tool: 1, // web search tool
+    files: [],
   });
 };
 
@@ -76,7 +103,7 @@ export const GenerateWithSupermemory = async ({
   conversationId,
   provider,
   modelName,
-  image = "",
+  image = [""],
 }): Promise<any> => {
   return Generate({
     email,
@@ -87,6 +114,28 @@ export const GenerateWithSupermemory = async ({
     modelName,
     image,
     tool: 2, // supermemory tool
+    files: [],
+  });
+};
+export const GenerateImage = async ({
+  email,
+  message,
+  newConvo,
+  conversationId,
+  provider,
+  modelName,
+  image = [""],
+}): Promise<any> => {
+  return Generate({
+    email,
+    message,
+    newConvo,
+    conversationId,
+    provider,
+    modelName,
+    image,
+    tool: 4, // iamge generation tool
+    files: [],
   });
 };
 
@@ -100,7 +149,6 @@ export const GetConvos = async ({ email }): Promise<any> => {
       title: c.title,
       messages: [], // always start blank
     }));
-    console.log(formatted);
     return {
       success: true,
       data: formatted,
@@ -125,7 +173,6 @@ export const getConvoMessage = async ({ convoId }): Promise<any> => {
       title: c.title,
       messages: [], // always start blank
     }));
-    console.log(formatted);
     return {
       success: true,
       data: res.data,

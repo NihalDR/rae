@@ -3,7 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Loader2, MessageCircle, Globe, Brain } from "lucide-react";
+import {
+  Plus,
+  Loader2,
+  MessageCircle,
+  Globe,
+  Brain,
+  Image,
+} from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import thinkingGif from "../../../assets/thinking.gif";
 import ChatSidebarButton from "./components/ChatSidebarButton";
@@ -13,6 +20,7 @@ import {
   Generate,
   GenerateWithWebSearch,
   GenerateWithSupermemory,
+  GenerateImage,
   getConvoMessage,
   BASE_URL,
 } from "@/api/chat";
@@ -50,7 +58,11 @@ export default function ChatWindow() {
   const [isAIThinking, setIsAIThinking] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [currentInputMessage, setCurrentInputMessage] = useState("");
-  const [selectedTool, setSelectedTool] = useState<0 | 1 | 2>(0); // 0=none, 1=web search, 2=supermemory
+  const [selectedTool, setSelectedTool] = useState<0 | 1 | 2 | 4>(0); // 0=none, 1=web search, 2=supermemory, 4=image generation
+  const [hoveredImageIndex, setHoveredImageIndex] = useState<number | null>(
+    null,
+  );
+  const [imageReferenced, setImageReferenced] = useState<boolean>(false);
   const [searchParams] = useSearchParams();
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -104,7 +116,8 @@ export default function ChatWindow() {
     modelName: string,
     image: string,
     tool: number,
-    newMessages: any[]
+    newMessages: any[],
+    files?: { name: string; type: string; size: number; content: string; textContent?: string }[],
   ) => {
     setStreamingMsg("");
     const response = await fetch(`${BASE_URL}/generate/msg`, {
@@ -121,6 +134,7 @@ export default function ChatWindow() {
         modelName,
         image,
         tool,
+        files: files || [],
       }),
     });
 
@@ -157,7 +171,10 @@ export default function ChatWindow() {
               { sender: "ai", text: fullText, image: "" },
             ];
             setMessages(updatedMessages);
-            updateConvoMessages(currentConvoId === -1 ? data.conversationId : currentConvoId, updatedMessages);
+            updateConvoMessages(
+              currentConvoId === -1 ? data.conversationId : currentConvoId,
+              updatedMessages,
+            );
             return {
               success: true,
               data: fullText,
@@ -184,13 +201,16 @@ export default function ChatWindow() {
     };
   };
 
-  const handleSend = async (userMsg: string, manualImage?: string) => {
+  const handleSend = async (userMsg: string, images?: string[], files?: { name: string; type: string; size: number; content: string; textContent?: string }[]) => {
+    const imagesToSend = images && images.length > 0 ? images : [""];
+    const filesToSend = files && files.length > 0 ? files : [];
     let newMessages = [
       ...messages,
       {
         sender: "user" as const,
         text: userMsg,
-        image: "",
+        image: imagesToSend,
+        files: filesToSend,
       },
     ];
     setMessages(newMessages);
@@ -198,9 +218,8 @@ export default function ChatWindow() {
     setIsAIThinking(true);
 
     try {
-      let imageToSend = manualImage || "";
-      if (!imageToSend && selectedTool === 0) {
-        // Streaming logic for normal chat (no image, no tool)
+      if ((!images || images.length === 0) && selectedTool === 0) {
+        // Streaming logic for normal chat (no image, no tool - files are supported in streaming)
         await handleStreamAIResponse(
           email,
           userMsg,
@@ -210,7 +229,8 @@ export default function ChatWindow() {
           currentModel.value,
           "",
           0,
-          newMessages
+          newMessages,
+          filesToSend,
         );
       } else if (selectedTool === 1) {
         const ai_res = await GenerateWithWebSearch({
@@ -220,14 +240,14 @@ export default function ChatWindow() {
           conversationId: currentConvoId,
           provider: currentModel.label,
           modelName: currentModel.value,
-          image: imageToSend,
+          image: imagesToSend,
         });
         let updatedMessages = [
           ...newMessages,
           {
             sender: "ai" as const,
             text: ai_res.aiResponse,
-            image: "",
+            image: [""],
           },
         ];
         setMessages(updatedMessages);
@@ -246,14 +266,14 @@ export default function ChatWindow() {
           conversationId: currentConvoId,
           provider: currentModel.label,
           modelName: currentModel.value,
-          image: imageToSend,
+          image: imagesToSend,
         });
         let updatedMessages = [
           ...newMessages,
           {
             sender: "ai" as const,
             text: ai_res.aiResponse,
-            image: "",
+            image: [""],
           },
         ];
         setMessages(updatedMessages);
@@ -265,7 +285,7 @@ export default function ChatWindow() {
           setCurrentConvo(ai_res.conversationId);
         }
       } else {
-        // Fallback: normal Generate for image
+        // Fallback: normal Generate for image or files
         const ai_res = await Generate({
           email: email,
           message: userMsg,
@@ -273,14 +293,15 @@ export default function ChatWindow() {
           conversationId: currentConvoId,
           provider: currentModel.label,
           modelName: currentModel.value,
-          image: imageToSend,
+          image: imagesToSend,
+          files: filesToSend,
         });
         let updatedMessages = [
           ...newMessages,
           {
             sender: "ai" as const,
             text: ai_res.aiResponse,
-            image: "",
+            image: [""],
           },
         ];
         setMessages(updatedMessages);
@@ -299,7 +320,7 @@ export default function ChatWindow() {
         {
           sender: "ai" as const,
           text: "Sorry, I encountered an error. Please try again.",
-          image: "",
+          image: [""],
         },
       ];
       setMessages(errorMessages);
@@ -371,11 +392,108 @@ export default function ChatWindow() {
     return;
   };
 
+  // Handler for image generation
+  const handleImageGeneration = async (
+    userMsg: string,
+    images?: string[],
+  ) => {
+    const imagesToSend = images && images.length > 0 ? images : [""];
+    let newMessages = [
+      ...messages,
+      {
+        sender: "user" as const,
+        text: userMsg,
+        image: imagesToSend,
+      },
+    ];
+    setMessages(newMessages);
+    updateConvoMessages(currentConvoId, newMessages);
+    setIsAIThinking(true);
+
+    try {
+      const ai_res = await GenerateImage({
+        email: email,
+        message: userMsg,
+        newConvo: currentConvoId == -1 ? true : false,
+        conversationId: currentConvoId,
+        provider: currentModel.label,
+        modelName: currentModel.value,
+        image: imagesToSend,
+      });
+      let updatedMessages = [
+        ...newMessages,
+        {
+          sender: "ai" as const,
+          text: ai_res.aiResponse,
+          image: ai_res.imageAi || "",
+        },
+      ];
+      setMessages(updatedMessages);
+      updateConvoMessages(currentConvoId, updatedMessages);
+      if (currentConvoId === -1) {
+        setTitleById(-1, ai_res.title);
+        updateConvoId(-1, ai_res.conversationId);
+        updateConvoMessages(ai_res.conversationId, updatedMessages);
+        setCurrentConvo(ai_res.conversationId);
+      }
+    } catch (error) {
+      console.error("Error generating image:", error);
+      const errorMessages = [
+        ...newMessages,
+        {
+          sender: "ai" as const,
+          text: "Sorry, I encountered an error with image generation.",
+          image: [""],
+        },
+      ];
+      setMessages(errorMessages);
+      updateConvoMessages(currentConvoId, errorMessages);
+    } finally {
+      setIsAIThinking(false);
+      setSelectedTool(0);
+    }
+  };
+
+  const handleReferenceImage = (imageBase64: string) => {
+    // Create a custom event to communicate with ChatInput component
+    const event = new CustomEvent("referenceImage", {
+      detail: { imageBase64, shouldSwitchTool: selectedTool !== 4 },
+    });
+    window.dispatchEvent(event);
+
+    // If not already on image generation tool, switch to it for better workflow
+    // if (selectedTool !== 4) {
+    //   setSelectedTool(4);
+    // }
+
+    setImageReferenced(true);
+    // Clear the notification after 3 seconds for image generation, 2 for others
+    const timeout = selectedTool === 4 ? 3000 : 2000;
+    setTimeout(() => setImageReferenced(false), timeout);
+  };
+
   const { name } = useUserStore();
   return (
-    <div className="w-full h-[calc(100vh-36px)]  bg-background flex ">
+    <div className="w-full h-dvh  bg-background flex ">
       {/* Chat Area only, sidebar removed */}
       <div className="flex flex-col w-full overflow-hidden relative">
+        {/* Image referenced notification */}
+        <AnimatePresence>
+          {imageReferenced && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="absolute top-2 right-2 z-50 bg-green-500 text-white px-3 py-2 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2"
+            >
+              <Image size={16} />
+              {selectedTool === 4
+                ? "Image ready for modification"
+                : "Image referenced for next message"}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <motion.div
           ref={chatContainerRef}
           className="flex flex-col overflow-hidden border-border relative h-[calc(100vh-170px)]"
@@ -387,7 +505,7 @@ export default function ChatWindow() {
               </div>
             )}
 
-            {/* {messages.length === 0 && !loadingMessages && (
+          {/* {messages.length === 0 && !loadingMessages && (
               <div className="flex-1 flex items-center justify-center text-zinc-500">
                 <div className="text-center">
                   <p className="text-lg mb-2">Start a conversation</p>
@@ -398,141 +516,207 @@ export default function ChatWindow() {
               </div>
             )} */}
 
-
-            {messages.map((msg, idx) => (
-              <div
-                key={idx}
-                className={`px-4 py-2 rounded-lg text-sm ${
-                  msg.sender === "user"
-                    ? "bg-foreground dark:bg-surface font-medium text-background self-end text-right ml-auto w-fit max-w-[70%]"
-                    : "bg-zinc-200 dark:bg-[#333333] dark:text-white  self-start text-left w-fit max-w-[450px]"
-                }`}
-              >
-                {msg.sender === "ai" ? (
-                  <div className="prose prose-sm max-w-fit prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-pre:hidden prose-code:hidden">
-                    {(() => {
-                      try {
-                        return (
-                          <ReactMarkdown
-                            remarkPlugins={[remarkGfm, remarkBreaks]}
-                            components={{
-                              code: ({
-                                className,
-                                children,
-                                ...props
-                              }: any) => {
-                                const inline = props.inline;
-                                return (
-                                  <CodeBlock
-                                    className={`${className} `}
-                                    inline={inline}
-                                    {...props}
-                                  >
-                                    {String(children).replace(/\n$/, "")}
-                                  </CodeBlock>
-                                );
-                              },
-                            }}
-                          >
-                            {msg.text || ""}
-                          </ReactMarkdown>
-                        );
-                      } catch (error) {
-                        console.error("Markdown render error:", error);
-                        // Fallback: Simple line break preservation
-                        return (
-                          <div style={{ whiteSpace: "pre-wrap" }}>
-                            {msg.text}
-                          </div>
-                        );
-                      }
-                    })()}
-                  </div>
-                ) : (
-                  msg.text
-                )}
-
-                {/* Show image if exists */}
-                {msg.image && (
-                  <div className="mt-2">
-                    <img
-                      src={msg.image}
-                      alt="User uploaded"
-                      className="max-w-full rounded-lg border border-gray-300"
-                    />
-                  </div>
-                )}
-              </div>
-            ))}
-
-            {/* Streaming AI message (if any) */}
-            {streamingMsg && (
-              <div className="px-4 py-2 rounded-lg text-sm bg-zinc-200 dark:bg-[#333333] dark:text-white self-start text-left w-fit max-w-[450px]">
+          {messages.map((msg, idx) => (
+            <div
+              key={idx}
+              className={`px-4 py-2 rounded-lg text-sm ${
+                msg.sender === "user"
+                  ? "bg-zinc-800 dark:bg-zinc-900 text-white rounded-2xl rounded-br-md px-4 py-3 self-end text-right ml-auto w-fit max-w-[70%]"
+                  : "bg-transparent text-foreground self-start text-left w-full"
+              }`}
+            >
+              {msg.sender === "ai" ? (
                 <div className="prose prose-sm max-w-fit prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-pre:hidden prose-code:hidden">
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm, remarkBreaks]}
-                    components={{
-                      code: ({ className, children, ...props }: any) => {
-                        const inline = props.inline;
-                        return (
-                          <CodeBlock className={className} inline={inline} {...props}>
-                            {String(children).replace(/\n$/, "")}
-                          </CodeBlock>
-                        );
-                      },
-                    }}
-                  >
-                    {streamingMsg}
-                  </ReactMarkdown>
+                  {(() => {
+                    try {
+                      return (
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm, remarkBreaks]}
+                          components={{
+                            code: ({ className, children, ...props }: any) => {
+                              const inline = props.inline;
+                              return (
+                                <CodeBlock
+                                  className={`${className} `}
+                                  inline={inline}
+                                  {...props}
+                                >
+                                  {String(children).replace(/\n$/, "")}
+                                </CodeBlock>
+                              );
+                            },
+                          }}
+                        >
+                          {msg.text || ""}
+                        </ReactMarkdown>
+                      );
+                    } catch (error) {
+                      console.error("Markdown render error:", error);
+                      // Fallback: Simple line break preservation
+                      return (
+                        <div style={{ whiteSpace: "pre-wrap" }}>{msg.text}</div>
+                      );
+                    }
+                  })()}
                 </div>
-              </div>
-            )}
-
-            {/* AI Thinking Animation - Simple Pulsing Dot */}
-            <AnimatePresence mode="popLayout">
-              {isAIThinking && (
-                <motion.div
-                  className="flex gap-2 mt-2 mx-4 dark:text-zinc-200  font-medium items-center text-sm h-fit"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <motion.div
-                    initial={{ borderRadius: "0%", rotate: "90deg" }}
-                    animate={{ borderRadius: ["0%","50%", "0%"], rotate: ["90deg", "180deg", "270deg"] }}
-                    transition={{
-                      duration: 1,
-                      ease: "linear",
-                      repeat: Infinity,
-                      repeatType: "loop",
-                    }}
-                    className="self-start flex items-center relative border-[3px] border-surface size-[20px] justify-center"
-                  ></motion.div>
-
-                  <div className="animate-pulse">Rae is thinking...</div>
-                </motion.div>
+              ) : (
+                msg.text
               )}
-            </AnimatePresence>
+
+              {/* Show image if exists */}
+              {msg.image && msg.image.filter((img: string) => img.trim() !== "").length > 0 && (
+  <div className="mt-2 flex flex-col gap-2">
+    {msg.image
+      .filter((img: string) => img.trim() !== "")
+      .map((img: string, imgIdx: number) => (
+        <div
+          key={imgIdx}
+          className="relative inline-block"
+          onMouseEnter={() =>
+            msg.sender === "ai" ? setHoveredImageIndex(idx) : null
+          }
+          onMouseLeave={() => setHoveredImageIndex(null)}
+        >
+          <img
+            src={img}
+            alt={msg.sender === "user" ? "User uploaded" : "AI generated"}
+            className={`max-w-full rounded-lg border border-gray-300 transition-all duration-200 ${
+              msg.sender === "ai"
+                ? "cursor-pointer hover:scale-[1.02] hover:shadow-lg"
+                : ""
+            }`}
+          />
+
+          {/* Hover overlay only for AI images */}
+          {msg.sender === "ai" && hoveredImageIndex === idx && (
+            <div className="absolute inset-0 bg-black bg-opacity-50 rounded-lg flex items-center justify-center transition-all duration-200 animate-in fade-in-0">
+              <button
+                onClick={() => handleReferenceImage(img)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 text-sm font-medium shadow-lg transform ${
+                  selectedTool === 4
+                    ? "bg-blue-500 text-white hover:bg-blue-600 hover:shadow-xl"
+                    : "bg-white text-black hover:bg-gray-100 hover:shadow-xl"
+                }`}
+                title={
+                  selectedTool === 4
+                    ? "Use this image for further modifications"
+                    : "Reference this image in your next message"
+                }
+              >
+                <Image size={16} />
+                {selectedTool === 4 ? "Modify" : "Reference"}
+              </button>
+            </div>
+          )}
+        </div>
+      ))}
+  </div>
+)}
+
+              {/* Show attached files if exist */}
+              {(msg as any).files && (msg as any).files.length > 0 && (
+                <div className="mt-2 flex flex-col gap-2">
+                  <div className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">
+                    Attached files:
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {(msg as any).files.map((file: any, fileIdx: number) => (
+                      <div
+                        key={fileIdx}
+                        className="flex items-center gap-2 px-3 py-2 bg-zinc-100 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700"
+                      >
+                        <div className="flex flex-col">
+                          <div className="text-sm font-medium truncate max-w-[150px]">
+                            {file.name}
+                          </div>
+                          <div className="text-xs text-zinc-500">
+                            {(file.size / 1024).toFixed(1)}KB • {file.type}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+
+          {/* Streaming AI message (if any) */}
+          {streamingMsg && (
+            <div className="px-4 py-2 rounded-lg text-sm bg-zinc-200 dark:bg-[#333333] dark:text-white self-start text-left w-fit max-w-[450px]">
+              <div className="prose prose-sm max-w-fit prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-pre:hidden prose-code:hidden">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm, remarkBreaks]}
+                  components={{
+                    code: ({ className, children, ...props }: any) => {
+                      const inline = props.inline;
+                      return (
+                        <CodeBlock
+                          className={className}
+                          inline={inline}
+                          {...props}
+                        >
+                          {String(children).replace(/\n$/, "")}
+                        </CodeBlock>
+                      );
+                    },
+                  }}
+                >
+                  {streamingMsg}
+                </ReactMarkdown>
+              </div>
+            </div>
+          )}
+
+          {/* AI Thinking Animation - Simple Pulsing Dot */}
+          <AnimatePresence mode="popLayout">
+            {isAIThinking && (
+              <motion.div
+                className="flex gap-2 mt-2 mx-4 dark:text-zinc-200  font-medium items-center text-sm h-fit"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.2 }}
+              >
+                <motion.div
+                  initial={{ borderRadius: "0%", rotate: "90deg" }}
+                  animate={{
+                    borderRadius: ["0%", "50%", "0%"],
+                    rotate: ["90deg", "180deg", "270deg"],
+                  }}
+                  transition={{
+                    duration: 1,
+                    ease: "linear",
+                    repeat: Infinity,
+                    repeatType: "loop",
+                  }}
+                  className="self-start flex items-center relative border-[3px] border-surface size-[20px] justify-center"
+                ></motion.div>
+
+                <div className="animate-pulse">Rae is thinking...</div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
             <div ref={bottomRef} />
           </div>
-
-          {/* Input area with overlay icons */}
         </motion.div>
+
+        {/* Input area with overlay icons */}
         <Chat
-          name={name}
-          onSend={handleSend}
-          onWebSearch={handleWebSearch}
-          onSupermemory={handleSupermemory}
-          currentModel={currentModel}
-          setCurrentModel={setCurrentModel}
-          models={MODELS}
-          initialMessage={initialMessage}
-          onTypingChange={handleTypingChange}
-          onMessageChange={setCurrentInputMessage}
-          selectedTool={selectedTool}
-          onToolChange={setSelectedTool}
-          initial={currentConvoId !== -1}
+            name={name || ""}
+            onSend={handleSend}
+            onWebSearch={handleWebSearch}
+            onSupermemory={handleSupermemory}
+            onImageGeneration={handleImageGeneration}
+            currentModel={currentModel}
+            setCurrentModel={setCurrentModel}
+            models={MODELS}
+            initialMessage={initialMessage}
+            onTypingChange={handleTypingChange}
+            onMessageChange={setCurrentInputMessage}
+            selectedTool={selectedTool}
+            onToolChange={setSelectedTool}
+            onReferenceImage={handleReferenceImage}
         />
       </div>
     </div>

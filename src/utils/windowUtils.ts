@@ -1,11 +1,17 @@
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { LogicalSize } from "@tauri-apps/api/dpi";
+import { LogicalPosition, LogicalSize } from "@tauri-apps/api/dpi";
 import { invoke } from "@tauri-apps/api/core";
+import { currentMonitor } from "@tauri-apps/api/window";
 
-export const resize = async (targetWidth: number, targetHeight: number) => {
+export const resize = async (targetWidth: number, targetHeight: number, center: boolean = false) => {
   const win = getCurrentWebviewWindow();
   try {
+    // console.log(monitorSize)
     await win.setSize(new LogicalSize(targetWidth, targetHeight));
+    if (center) {
+      const monitorSize = (await currentMonitor()).size
+      await win.setPosition(new LogicalPosition( monitorSize.width/2 - targetWidth/2 , 0));
+    }
   } catch (err) {
     console.error("Error during smooth resize:", err);
   }

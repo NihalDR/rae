@@ -7,7 +7,6 @@ export const GetNotes = async ({ email }): Promise<string[]> => {
     const res = await axios.post(`${BASE_URL}/notes/all`, {
       email,
     });
-    console.log(res.data);
     return res.data.result.user_context;
   } catch (err: any) {
     return ["Error Showing Data"];
