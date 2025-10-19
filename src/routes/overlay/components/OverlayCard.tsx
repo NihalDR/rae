@@ -11,7 +11,9 @@ import { animations } from "@/constants/animations";
 import { useUserStore } from "@/store/userStore";
 import { useNoteStore } from "@/store/noteStore";
 import { GetNotes } from "@/api/notes";
+import { useUpdateCheck, handleUpdateClick } from "@/utils/updateUtils";
 import {
+  ArrowCircleUpIcon,
   ArrowElbowDownLeftIcon,
   ChatIcon,
   CornersOutIcon,
@@ -314,6 +316,7 @@ const Overlay = () => {
   const [isActive, setIsActive] = useState<boolean>(
     () => localStorage.getItem("overlay_active") !== "false", // Default to true if not set
   );
+  const updateAvailable = useUpdateCheck();
   // Handler to spawn overlay-extended window
 
   const [windowName, setWindowName] = useState("");
@@ -1319,6 +1322,25 @@ const Overlay = () => {
                   )}
                   {/* <EarIcon weight={listening ? "fill" : "bold"} /> */}
                 </OverlayButton>
+                {updateAvailable && (
+                  <OverlayButton
+                    onClick={() => {
+                      handleUpdateClick();
+                    }}
+                    title="Update available"
+                    draggable={!isPinned}
+                    className="!text-red-500 dark:!text-red-500 relative"
+                  >
+                    <ArrowCircleUpIcon weight="bold" size={16} />
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className="absolute top-0 right-0 w-1.5 h-1.5 bg-red-500 rounded-full"
+                    >
+                      <div className="w-full h-full bg-red-500 rounded-full animate-ping" />
+                    </motion.div>
+                  </OverlayButton>
+                )}
                 <OverlayButton
                   onClick={handlePinClick}
                   active={isPinned}
