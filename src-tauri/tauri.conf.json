@@ -57,7 +57,7 @@
     "autostart": null,
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEY2MDMzODdCMjlFMkI2QTIKUldTaXR1SXBlemdEOWlCOFcwdTZJUmw2OEhMUHZqaXJuUUdqeHpEcm8zMmdmK3JkeHIrbGxjdXEK",
-      "endpoints": ["https://your-domain.com/updates/latest.json"]
+      "endpoints": ["https://raeai.app/updates/latest.json"]
     }
   }
 }
