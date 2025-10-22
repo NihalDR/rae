@@ -29,7 +29,7 @@ const createNavigationManager = (navigate: (to: string) => void) => {
   };
 
   return {
-    setupNavigationListener
+    setupNavigationListener,
   };
 };
 
@@ -44,15 +44,15 @@ const createWindowFollowerManager = () => {
     try {
       const win = getCurrentWebviewWindow();
       const overlayWindow = (await getAllWindows()).find(
-        (w) => w.label === "overlay"
+        (w) => w.label === "overlay",
       );
       if (overlayWindow) {
         const overlayPosition = await overlayWindow.outerPosition();
         await win.setPosition(
           new LogicalPosition(
             overlayPosition.x + 240 - 500,
-            overlayPosition.y + 60
-          )
+            overlayPosition.y + 60,
+          ),
         );
       }
     } catch (e) {
@@ -79,14 +79,14 @@ const createWindowFollowerManager = () => {
 
   return {
     startFollowing,
-    stopFollowing
+    stopFollowing,
   };
 };
 
 // App Visibility Manager - handles app show/hide logic
 const createAppVisibilityManager = (
   setShowApp: (show: boolean) => void,
-  windowFollower: any
+  windowFollower: any,
 ) => {
   const showApp = async () => {
     try {
@@ -96,7 +96,7 @@ const createAppVisibilityManager = (
 
       // Position window relative to overlay first
       const overlayWindow = (await getAllWindows()).find(
-        (w) => w.label === "overlay"
+        (w) => w.label === "overlay",
       );
 
       if (overlayWindow) {
@@ -104,8 +104,8 @@ const createAppVisibilityManager = (
         await win.setPosition(
           new LogicalPosition(
             overlayPosition.x + 240 - 500,
-            overlayPosition.y + 60
-          )
+            overlayPosition.y + 60,
+          ),
         );
       }
 
@@ -148,7 +148,7 @@ const createAppVisibilityManager = (
   };
 
   return {
-    setupAppVisibilityListener
+    setupAppVisibilityListener,
   };
 };
 
@@ -171,7 +171,7 @@ const createEventListenerManager = (navigate: (to: string) => void) => {
   };
 
   return {
-    setupTransferChatListener
+    setupTransferChatListener,
   };
 };
 
@@ -183,7 +183,10 @@ export default function MainApp() {
   // Initialize managers
   const navigationManager = createNavigationManager(navigate);
   const windowFollower = createWindowFollowerManager();
-  const appVisibilityManager = createAppVisibilityManager(setShowApp, windowFollower);
+  const appVisibilityManager = createAppVisibilityManager(
+    setShowApp,
+    windowFollower,
+  );
   const eventListenerManager = createEventListenerManager(navigate);
 
   // Setup navigation listener
@@ -216,7 +219,7 @@ export default function MainApp() {
               initial={{
                 height: "512px",
                 width: "480px",
-                opacity: 0,
+                opacity: 1,
               }}
               animate={{
                 opacity: 1,
@@ -233,8 +236,9 @@ export default function MainApp() {
                 ease: "circInOut",
                 type: "tween",
                 opacity: {
-                  duration: 0
-                }
+                  duration: 0.2,
+                  delay: 0.2,
+                },
               }}
               className="flex  overflow-hidden rounded-lg "
             >

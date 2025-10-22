@@ -1147,7 +1147,7 @@ const Overlay = () => {
               ? {
                   scale: 1,
                   y: 0,
-                  borderRadius: "0px",
+                  borderRadius: "12px",
                   width: EXPANDED_WIDTH,
                   height: "100%",
                   x: 0,
@@ -1358,28 +1358,6 @@ const Overlay = () => {
             {/* Hide voice and pin buttons in maximized state */}
             {!isMaximized && (
               <>
-                {/*<OverlayButton
-                  onClick={() => {
-                    console.log("🎛️ Toggling assist mode...", {
-                      currentAssist: assist,
-                      audioClientActive,
-                      willBeActive: !assist,
-                    });
-                    setAssist((v) => !v);
-                  }}
-                  active={assist}
-                  title={`Voice Assistant ${assist ? "Active" : "Inactive"} - ${
-                    audioClientActive ? "Connected" : "Disconnected"
-                  }`}
-                  // draggable={!isPinned}
-                  className={
-                    assist
-                      ? audioClientActive
-                        ? "!text-[#ffe941] dark:!text-surface animate-pulse"
-                        : "!text-orange-400 dark:!text-orange-300"
-                      : ""
-                  }
-                >*/}
                 {/*{assist ? (
                     <EarIcon weight="bold" size={16} />
                   ) : (
@@ -1429,7 +1407,7 @@ const Overlay = () => {
                     {/* Navigation buttons for maximized state - centered */}
                     <OverlayButton
                       onClick={() => emit("navigate_to", { to: "/app/chat" })}
-                      active={currentPage === "chat"}
+                      // active={currentPage === "chat"}
                       title="Chat"
                       draggable={!isPinned}
                     >
@@ -1445,7 +1423,7 @@ const Overlay = () => {
                     >
                       <GearSixIcon size={16} />
                     </OverlayButton>
-                    <OverlayButton
+                    {/*<OverlayButton
                       onClick={() =>
                         emit("navigate_to", { to: "/app/settings/preferences" })
                       }
@@ -1454,7 +1432,7 @@ const Overlay = () => {
                       draggable={!isPinned}
                     >
                       <FileTextIcon size={16} />
-                    </OverlayButton>
+                    </OverlayButton>*/}
                   </div>
                 )}
                 <OverlayButton
