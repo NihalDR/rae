@@ -3,6 +3,7 @@ import { motion } from "motion/react";
 import { useUpdateCheck, handleUpdateClick } from "@/utils/updateUtils";
 import { emit, listen } from "@tauri-apps/api/event";
 import { useEffect, useState } from "react";
+import { SidebarButton } from "./Sidebar";
 
 interface UpdateButtonProps {
   expanded: boolean;
@@ -76,64 +77,48 @@ export const UpdateButton = ({
   };
 
   return (
-    <motion.button
-      whileHover="hover"
-      initial={{
-        paddingInline: expanded ? "0px" : "0px",
-        fontSize: expanded ? "14px" : "14px",
-      }}
-      animate={{
-        paddingInline: expanded ? "0px" : "0px",
-        fontSize: expanded ? "14px" : "14px",
-      }}
-      onClick={handleClick}
-      disabled={isUpdating}
-      className={`w-full shrink-0 group h-[44px] flex items-center overflow-hidden rounded-sm cursor-pointer flex-nowrap whitespace-nowrap font-medium duration-100 relative ${
-        updateAvailable && expanded
-          ? "dark:bg-red-500/90 dark:text-white dark:hover:bg-red-600 animate-pulse"
-          : `dark:bg-stone-800/20 dark:hover:text-white dark:hover:bg-stone-800 transition-colors dark:text-stone-400 ${
-              active && "dark:!bg-stone-800 dark:!text-white"
-            }`
-      } ${isUpdating ? "opacity-50 cursor-not-allowed" : ""}`}
-    >
-      <motion.div
-        animate={{
-          fontSize: expanded ? "14px" : "20px",
-        }}
-        className="h-full aspect-square flex items-center justify-center shrink-0 relative"
-      >
-        <motion.div
-          variants={{
-            hover: {
-              // y: -2,
-            },
-          }}
-          transition={{ duration: 0.2, ease: "easeInOut", type: "tween" }}
-        >
-          <ArrowCircleUpIcon className={isUpdating ? "animate-spin" : ""} />
-        </motion.div>
-        {updateAvailable && !expanded && (
+    <div className="relative">
+      <SidebarButton
+        active={active}
+        expanded={expanded}
+        onClick={handleClick}
+        logo={
           <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"
+            variants={{
+              hover: {
+                // y: -2,
+              },
+            }}
+            transition={{ duration: 0.2, ease: "easeInOut", type: "tween" }}
+            className="relative"
           >
-            <div className="w-full h-full bg-red-500 rounded-full animate-ping" />
+            <ArrowCircleUpIcon className={isUpdating ? "animate-spin" : ""} />
+            {updateAvailable && !expanded && (
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"
+              >
+                <div className="w-full h-full bg-red-500 rounded-full animate-ping" />
+              </motion.div>
+            )}
           </motion.div>
-        )}
-      </motion.div>
-      <motion.div
-        className="min-w-fit w-full pr-4 text-left"
-        animate={{ opacity: !expanded ? 0 : 1 }}
+        }
       >
-        {expanded
-          ? isUpdating
-            ? "Updating..."
-            : updateAvailable
-              ? "Update available"
-              : "No updates available"
-          : "Updates"}
-      </motion.div>
-    </motion.button>
+        <span
+          className={`${
+            updateAvailable && expanded ? "text-red-400 animate-pulse" : ""
+          } ${isUpdating ? "opacity-50" : ""}`}
+        >
+          {expanded
+            ? isUpdating
+              ? "Updating..."
+              : updateAvailable
+                ? "Update available"
+                : "No updates available"
+            : "Updates"}
+        </span>
+      </SidebarButton>
+    </div>
   );
 };
