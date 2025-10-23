@@ -63,7 +63,7 @@ export const SidebarButton = ({
     >
       <motion.div
         animate={{
-          fontSize: expanded ? "14px" : "20px",
+          fontSize: expanded ? "20px" : "20px",
         }}
         className="h-full aspect-square flex items-center justify-center shrink-0"
       >

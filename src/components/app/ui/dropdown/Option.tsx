@@ -34,8 +34,9 @@ const Option: React.FC<OptionProps> = ({
       <button
         onClick={handleClick}
         disabled={disabled}
-        className={`flex gap-2 text-sm w-full transition-colors duration-100 px-2 py-1 dark:text-stone-400 font-medium hover:dark:text-white hover:dark:bg-stone-900 ${
-          active && "dark:!bg-surface dark:!text-white"
+        className={`flex gap-2 text-sm w-full transition-colors duration-100 px-2 py-1 dark:text-stone-400 font-medium hover:dark:text-white bg-gradient-to-b hover:from-stone-800 hover:to-stone-900 ${
+          active &&
+          " bg-gradient-to-b from-surface to-surface/60 shadow-[inset_0px_1px_1px_rgba(255,255,255,0.5)] !text-white"
         } ${
           disabled && "opacity-50 cursor-not-allowed"
         } rounded-md items-center ${className}`}
@@ -67,9 +68,7 @@ const Option: React.FC<OptionProps> = ({
       disabled={disabled}
       className={`h-9 text-left px-3 text-sm transition-colors whitespace-nowrap dark:text-stone-300 hover:dark:text-white hover:dark:bg-stone-900 ${
         active ? "font-semibold dark:bg-stone-900" : ""
-      } ${
-        disabled ? "opacity-50 cursor-not-allowed" : ""
-      } ${className}`}
+      } ${disabled ? "opacity-50 cursor-not-allowed" : ""} ${className}`}
     >
       <div className="flex items-center gap-2">
         {icon}
