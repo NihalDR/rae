@@ -33,15 +33,15 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
   const getPositionClasses = () => {
     switch (position) {
       case "bottom-left":
-        return "left-1 bottom-full mb-1";
+        return "left-0 bottom-full mb-1";
       case "bottom-right":
-        return "right-1 bottom-full mb-1";
+        return "right-0 bottom-full mb-1";
       case "top-left":
-        return "left-1 top-full mt-1";
+        return "left-0 top-full mt-1";
       case "top-right":
-        return "right-1 top-full mt-1";
+        return "right-0 top-full mt-1";
       default:
-        return "left-1 bottom-full mb-1";
+        return "left-0 bottom-full mb-1";
     }
   };
 
@@ -84,7 +84,7 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
               duration: 0.2,
               ease: "circInOut",
             }}
-            className={`dark:bg-stone-950 z-40 overflow-hidden rounded-lg shadow-xl shadow-black/40 absolute flex flex-col border border-border ${getPositionClasses()} ${className}`}
+            className={`dark:bg-stone-950 z-40 overflow-hidden rounded-md  absolute flex flex-col border border-border left-0 ${getPositionClasses()} ${className}`}
           >
             <div
               onClick={(e) => e.stopPropagation()}

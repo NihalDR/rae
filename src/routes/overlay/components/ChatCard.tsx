@@ -11,7 +11,18 @@ import {
   BASE_URL,
 } from "@/api/chat";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Loader2, Minimize2, Image, Plus } from "lucide-react";
+import {
+  X,
+  Loader2,
+  Minimize2,
+  Image,
+  Plus,
+  ChevronDown,
+  Send,
+  Globe,
+  Brain,
+  Wrench,
+} from "lucide-react";
 import MarkdownRenderer from "@/components/misc/MarkdownRenderer";
 
 import { animations } from "@/constants/animations";
@@ -68,6 +79,7 @@ interface ChatViewProps {
 
 import {
   CustomDropdown,
+  Option,
   type DropdownOption,
 } from "@/components/app/ui/dropdown";
 import { set } from "zod";
@@ -106,6 +118,10 @@ export const ChatView = ({
   const [chatInputText, setChatInputText] = useState("");
   const [currentModel, setCurrentModel] = useState(MODELS[0]);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  // Refs for dropdown management
+  const modelDropdownRef = useRef<HTMLDivElement>(null);
+  const toolsDropdownRef = useRef<HTMLDivElement>(null);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [titleLoading, setTitleLoading] = useState(false);
   const [currResponse, setCurrResponse] = useState<string>("");
@@ -162,6 +178,27 @@ export const ChatView = ({
     return () => {
       unlisten.then((fn) => fn());
     };
+  }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        modelDropdownRef.current &&
+        !modelDropdownRef.current.contains(event.target as Node)
+      ) {
+        setDropdownOpen(false);
+      }
+      if (
+        toolsDropdownRef.current &&
+        !toolsDropdownRef.current.contains(event.target as Node)
+      ) {
+        setOptionsOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   // Listen for preference changes from settings
@@ -1189,120 +1226,130 @@ export const ChatView = ({
                     )}
                   </AnimatePresence>
 
-                  <OverlayButton
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDropdownOpen((v) => !v);
-                      setOptionsOpen(false);
-                    }}
-                    className="dark:bg-stone-950"
-                    title={currentModel.value}
-                  >
-                    <img
-                      src={openaiLogo}
-                      alt="OpenAI"
-                      className="w-5 h-5 dark:invert"
-                    />
-                  </OverlayButton>
-                  <CustomDropdown
-                    isOpen={dropdownOpen}
-                    onClose={() => setDropdownOpen(false)}
-                    options={MODELS.map(
-                      (model): DropdownOption => ({
-                        label: model.value,
-                        value: model.value,
-                        active: model.value === currentModel.value,
-                        icon: (
-                          <img
-                            src={openaiLogo}
-                            alt="OpenAI"
-                            className="w-5 h-5 dark:invert"
-                          />
-                        ),
-                        onClick: () => setCurrentModel(model),
-                      }),
-                    )}
-                    variant="rich"
-                    position="bottom-left"
-                    minWidth="160px"
-                  />
+                  <div className="h-full w-fit relative" ref={modelDropdownRef}>
+                    <CustomDropdown
+                      isOpen={dropdownOpen}
+                      onClose={() => setDropdownOpen(false)}
+                      position="bottom-left"
+                      variant="rich"
+                      minWidth="160px"
+                    >
+                      {MODELS.map((model) => (
+                        <Option
+                          key={model.value}
+                          label={model.value}
+                          value={model.value}
+                          active={model.value === currentModel.value}
+                          variant="rich"
+                          onClick={() => setCurrentModel(model)}
+                        />
+                      ))}
+                    </CustomDropdown>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDropdownOpen(!dropdownOpen);
+                        setOptionsOpen(false);
+                      }}
+                      className="h-full px-3 border border-border whitespace-nowrap rounded-md  hover:bg-foreground/5 transition-colors duration-100 flex items-center gap-2 text-sm font-medium text-foreground/70"
+                      title={currentModel.value}
+                    >
+                      {currentModel.value}
+                      <ChevronDown
+                        className={`${dropdownOpen ? "rotate-180" : ""} transition-all`}
+                        size={12}
+                      />
+                    </button>
+                  </div>
                 </div>
-                <div className="h-full w-fit relative  flex items-center p-1 ">
+                <div
+                  className="h-full w-fit py-1 ml-1 relative mr-1"
+                  ref={toolsDropdownRef}
+                >
                   <CustomDropdown
                     isOpen={optionsOpen}
-                    onClose={() => {
-                      setOptionsOpen(false);
-                      setDropdownOpen(false);
-                    }}
-                    options={[
-                      {
-                        label: "Web Search",
-                        value: "web-search",
-                        active: selectedTool === 1,
-                        icon: <GlobeSimpleIcon className="text-lg" />,
-                        onClick: () =>
-                          setSelectedTool(selectedTool === 1 ? 0 : 1),
-                      },
-                      {
-                        label: "Super Memory",
-                        value: "super-memory",
-                        active: selectedTool === 2,
-                        icon: <BrainIcon className="text-lg" />,
-                        onClick: () =>
-                          setSelectedTool(selectedTool === 2 ? 0 : 2),
-                      },
-                      {
-                        label: "Image Generation",
-                        value: "image-generation",
-                        active: selectedTool === 4,
-                        icon: <Pencil className="text-lg" />,
-                        onClick: () =>
-                          setSelectedTool(selectedTool === 4 ? 0 : 4),
-                      },
-                      {
-                        label: "Stealth Mode",
-                        value: "stealth-mode",
-                        active: stealthMode,
-                        icon: <EyeSlashIcon className="text-lg" />,
-                        onClick: async () => {
-                          const newStealthMode = !stealthMode;
-                          setStealthMode(newStealthMode);
-                          try {
-                            await invoke("set_stealth_mode_enabled", {
-                              enabled: newStealthMode,
-                            });
-                            emit("stealth_mode_changed", {
-                              enabled: newStealthMode,
-                            });
-                          } catch (error) {
-                            console.error(
-                              "Failed to toggle stealth mode:",
-                              error,
-                            );
-                            // Revert state if backend call fails
-                            setStealthMode(stealthMode);
-                          }
-                        },
-                      },
-                    ]}
-                    variant="rich"
+                    onClose={() => setOptionsOpen(false)}
                     position="bottom-left"
-                    className="w-[200px]"
-                  />
-                  <OverlayButton
+                    variant="rich"
+                    minWidth="200px"
+                  >
+                    <Option
+                      label="Normal Chat"
+                      value="normal"
+                      icon={<Send size={16} />}
+                      active={selectedTool === 0}
+                      variant="rich"
+                      onClick={() => setSelectedTool(0)}
+                    />
+                    <Option
+                      label="Web Search"
+                      value="web-search"
+                      icon={<Globe size={16} />}
+                      active={selectedTool === 1}
+                      variant="rich"
+                      onClick={() => setSelectedTool(1)}
+                    />
+                    <Option
+                      label="Super Memory"
+                      value="super-memory"
+                      icon={<Brain size={16} />}
+                      active={selectedTool === 2}
+                      variant="rich"
+                      onClick={() => setSelectedTool(2)}
+                    />
+                    <Option
+                      label="Image Generation"
+                      value="image-generation"
+                      icon={<Image size={16} />}
+                      active={selectedTool === 4}
+                      variant="rich"
+                      onClick={() => setSelectedTool(4)}
+                    />
+                    <Option
+                      label="Stealth Mode"
+                      value="stealth-mode"
+                      icon={<EyeSlashIcon size={16} />}
+                      active={stealthMode}
+                      variant="rich"
+                      onClick={async () => {
+                        const newStealthMode = !stealthMode;
+                        setStealthMode(newStealthMode);
+                        try {
+                          await invoke("set_stealth_mode_enabled", {
+                            enabled: newStealthMode,
+                          });
+                          emit("stealth_mode_changed", {
+                            enabled: newStealthMode,
+                          });
+                        } catch (error) {
+                          console.error(
+                            "Failed to toggle stealth mode:",
+                            error,
+                          );
+                          // Revert state if backend call fails
+                          setStealthMode(stealthMode);
+                        }
+                      }}
+                    />
+                  </CustomDropdown>
+                  <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      setOptionsOpen((v) => !v);
+                      setOptionsOpen(!optionsOpen);
                       setDropdownOpen(false);
                     }}
-                    className="dark:bg-stone-950"
-                    title="Options"
+                    className="h-full border border-border rounded-md hover:bg-foreground/5 px-2 transition-colors duration-100 flex items-center gap-2 text-sm font-medium text-foreground/70"
                   >
-                    <SlidersHorizontalIcon weight="bold" />
-                  </OverlayButton>
+                    <Wrench size={16} />
+
+                    <ChevronDown
+                      className={`${optionsOpen ? "rotate-180" : ""} transition-all`}
+                      size={12}
+                    />
+                  </button>
                 </div>
                 <div className="w-full h-full py-1 relative">
-                  <div className="relative  size-full dark:bg-stone-950 focus-within:dark:bg-stone-950 rounded-lg transition-all duration-100 border-2 dark:border-stone-950 focus-within:dark:border-stone-900">
+                  <div className="relative  size-full dark:bg-stone-950 focus-within:dark:bg-stone-950 rounded-md transition-all duration-100 border dark:border-stone-950 focus-within:dark:border-stone-900">
                     {/* Tool indicator */}
                     <AnimatePresence>
                       {selectedTool > 0 && (
