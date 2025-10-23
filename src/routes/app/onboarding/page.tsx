@@ -1,11 +1,8 @@
 import { listen } from "@tauri-apps/api/event";
 import React, { useEffect, useState } from "react";
-import Auth from "./steps/Authentication";
-import FinishStep from "./steps/Finish";
-import MagicDotStep from "./steps/MagicDot";
-import FetchInfo from "./steps/SettingUp";
-import Name from "./steps/UserDetails";
+
 import Welcome from "./steps/Welcome";
+import Onboard from "./steps/Onboard";
 const Onboarding: React.FC = () => {
   const [step, setStep] = useState<string>("welcome");
 
@@ -51,11 +48,7 @@ const Onboarding: React.FC = () => {
       {/*//After NAME IT DIRECTLY NAVS TO FINISH FOR NEW USERS*/}
       <div className="bg-background text-foreground flex-grow">
         {step === "welcome" && <Welcome onNext={setStep} />}
-        {step === "auth" && <Auth onNext={setStep} />}
-        {step === "name" && <Name onNext={setStep} />}
-        {step === "magic_dot" && <MagicDotStep />}
-        {step === "finish" && <FinishStep onNext={setStep} />}
-        {step === "fetchInfo" && <FetchInfo />}
+        {step === "onboard" && <Onboard onNext={setStep} />}
       </div>
     </div>
   );
