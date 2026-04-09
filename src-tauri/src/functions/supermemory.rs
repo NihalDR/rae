@@ -9,7 +9,9 @@ pub async fn create_connection(
     email: String,
 ) -> Result<(), String> {
     let client = Client::new();
-    let api_key = "sm_WLKNg9oFivbEfiyTL74X9c_iuykaClixbOsNbDJsQZcrvXABPjcXOokMiqUdvsVUXhwqOnjLeRwcojMoOWoVGrk";
+    // Security fix: require the Supermemory API key to be provided via environment variable instead of hardcoding it.
+    let api_key = std::env::var("SUPERMEMORY_API_KEY")
+        .map_err(|_| "Missing SUPERMEMORY_API_KEY environment variable".to_string())?;
 
     let body = serde_json::json!({
         // No redirectUrl needed since we're opening externally

@@ -7,6 +7,7 @@
 }
 
 import axios from "axios";
+import { useUserStore } from "../store/userStore";
 
 const BASE_URL = "https://quackback-xwhd.onrender.com/api";
 export const SignUp = async (
@@ -35,13 +36,17 @@ export const SignUp = async (
 export const Login = async (
   email: string,
   password: string,
-): Promise<{ success: boolean; message: string }> => {
+): Promise<{ success: boolean; message: string; token: string | null }> => {
   try {
     const res = await axios.post(`${BASE_URL}/auth/login`, { email, password });
+    // Security fix: capture the backend token on login and persist it so authenticated API calls can include it.
+    const token = res.data.token ?? null;
+    useUserStore.getState().setUser({ email, token });
 
     return {
       success: res.status === 200,
       message: res.data.message || "Login successful.",
+      token,
     };
   } catch (err: any) {
     const raw = err.response?.data?.message || err.message || "";
@@ -63,6 +68,7 @@ export const Login = async (
     return {
       success: false,
       message,
+      token: null,
     };
   }
 };

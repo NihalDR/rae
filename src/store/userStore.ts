@@ -5,11 +5,12 @@ import { persist } from "zustand/middleware";
 interface UserState {
   email: string | null;
   name: string | null;
+  token: string | null;
 
   loggedIn: boolean;
   showSplash: boolean;
   // actions
-  setUser: (user: Partial<Pick<UserState, "email" | "name">>) => void;
+  setUser: (user: Partial<Pick<UserState, "email" | "name" | "token">>) => void;
   setLoggedIn: (flag: boolean) => void;
   setShowSplash: (flag: boolean) => void;
   clearUser: () => void;
@@ -21,13 +22,16 @@ export const useUserStore = create<UserState>()(
     (set) => ({
       email: null,
       name: null,
+      token: null,
 
       loggedIn: false,
       showSplash: true,
-      setUser: ({ email, name }) =>
+      // Security fix: persist the auth token with the user record so API modules can read it for Authorization headers.
+      setUser: ({ email, name, token }) =>
         set((state) => ({
           email: email ?? state.email,
           name: name ?? state.name,
+          token: token ?? state.token,
         })),
       setLoggedIn: (flag: boolean) => set(() => ({ loggedIn: flag })),
       setShowSplash: (flag: boolean) => set(() => ({ showSplash: flag })),
@@ -35,6 +39,7 @@ export const useUserStore = create<UserState>()(
         set(() => ({
           email: null,
           name: null,
+          token: null,
 
           loggedIn: false,
           showSplash: true,
@@ -46,6 +51,7 @@ export const useUserStore = create<UserState>()(
       partialize: (state) => ({
         email: state.email,
         name: state.name,
+        token: state.token,
         loggedIn: state.loggedIn,
         showSplash: state.showSplash,
       }),
