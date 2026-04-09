@@ -4,9 +4,16 @@
 */
 
 import axios from "axios";
+import { useUserStore } from "../store/userStore";
 
 export const BASE_URL = "https://quackback-xwhd.onrender.com/api";
 //export const BASE_URL = "http://localhost:8000/api";
+// Security fix: include the persisted bearer token when available without changing request behavior when unauthenticated.
+const getAuthHeaders = () => {
+  const token = useUserStore.getState().token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 export const Generate = async ({
   email,
   message,
@@ -46,7 +53,7 @@ export const Generate = async ({
         image: normalizedImage,
         tool,
         files,
-      });
+      }, { headers: getAuthHeaders() });
       return res.data;
     } else {
       // Handle the else case (you had an empty else block)
@@ -60,7 +67,7 @@ export const Generate = async ({
         image: normalizedImage,
         tool,
         files,
-      });
+      }, { headers: getAuthHeaders() });
       return res.data;
     }
   } catch (err: any) {
@@ -143,6 +150,8 @@ export const GetConvos = async ({ email }): Promise<any> => {
   try {
     const res = await axios.post(`${BASE_URL}/conversations/title`, {
       email,
+    }, {
+      headers: getAuthHeaders(),
     });
     const formatted = res.data.map((c: any) => ({
       id: c.id,
@@ -167,6 +176,8 @@ export const getConvoMessage = async ({ convoId }): Promise<any> => {
   try {
     const res = await axios.post(`${BASE_URL}/conversations/messages`, {
       conversationId: convoId,
+    }, {
+      headers: getAuthHeaders(),
     });
     const formatted = res.data.map((c: any) => ({
       id: c.id,

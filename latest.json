@@ -4,7 +4,7 @@
   "platforms": {
     "windows-x86_64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTaXR1SXBlemdEOWoySGtTRUhQSXpvZTdKRGcrZEhDMmFsdHVwNVVEWno1Y2VFZ2RlME1jcWlvQmk0SVJDa0pXOWxaVFdwenNnalA0VHl4TjhBVE5HRW55UE5aU3IrMEFRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzYwODY5Mzc2CWZpbGU6cmFlXzAuMS4wX3g2NF9lbi1VUy5tc2kKVE9WMHRGZWY3aFkrRk5TNmZrWG04SnF1SVhhZHJBLzJXTUlKNFBwUEl0S0h2czRXSWFXUFI4N0crbzVNY3pDM1J1RFhIM1duSE4rVUxFbTJ0WGZqQ0E9PQo=",
-      "url": "https://your-domain.com/updates/myapp-setup.exe"
+      "url": "https://github.com/rae-app/rae/releases/latest/download/rae_0.1.0_x64_en-US.msi"
     }
   }
 }

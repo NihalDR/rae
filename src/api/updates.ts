@@ -6,9 +6,15 @@
 }
 
 import axios from "axios";
+import { useUserStore } from "../store/userStore";
 
 export const BASE_URL = "https://quackback-xwhd.onrender.com";
 // const BASE_URL = "http://localhost:8000";
+// Security fix: include the persisted bearer token for profile update requests when available.
+const getAuthHeaders = () => {
+  const token = useUserStore.getState().token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
 
 export const NameUpdate = async (
   name: string,
@@ -18,6 +24,8 @@ export const NameUpdate = async (
     const res = await axios.post(`${BASE_URL}/api/update/name`, {
       email: email,
       name: name,
+    }, {
+      headers: getAuthHeaders(),
     });
     return {
       success: res.status === 201,

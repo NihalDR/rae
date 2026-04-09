@@ -28,7 +28,7 @@
       }
     ],
     "security": {
-      "csp": null,
+      "csp": "default-src 'self'; script-src 'self'; connect-src https://quackback-xwhd.onrender.com https://api.supermemory.ai wss://localhost:8000 ws://localhost:8000; img-src 'self' data: blob:; media-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:",
       "capabilities": ["default", "overlay-capability", "chat-capability"]
     }
   },

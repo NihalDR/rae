@@ -11,9 +11,33 @@ use winapi::um::winuser::{
 
 // VK_V constant (not defined in winapi crate)
 const VK_V: u16 = 0x56;
+// Security fix: block text injection into sensitive window types by matching known risky title substrings.
+const BLOCKED_TITLES: [&str; 12] = [
+    "keepass",
+    "1password",
+    "bitwarden",
+    "lastpass",
+    "dashlane",
+    "cmd",
+    "powershell",
+    "terminal",
+    "bash",
+    "zsh",
+    "windows security",
+    "task manager",
+];
 
 #[tauri::command]
 pub fn inject_text_to_window_by_title(text: String, window_title: String) -> Result<(), String> {
+    // Security fix: refuse injection into sensitive apps identified by blocked window title fragments.
+    let normalized_title = window_title.to_lowercase();
+    if BLOCKED_TITLES
+        .iter()
+        .any(|blocked_title| normalized_title.contains(blocked_title))
+    {
+        return Err("Injection into this window type is not permitted".to_string());
+    }
+
     unsafe {
         let wide_title: Vec<u16> = std::ffi::OsStr::new(&window_title)
             .encode_wide()
